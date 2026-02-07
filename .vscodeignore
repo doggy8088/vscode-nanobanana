@@ -1,0 +1,10 @@
+.vscode/**
+.vscode-test/**
+out/**
+src/**
+tests/**
+*.ts
+*.map
+esbuild.js
+tsconfig.json
+vitest.config.ts

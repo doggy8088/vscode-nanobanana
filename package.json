@@ -1,0 +1,86 @@
+{
+  "name": "vscode-image-generator",
+  "displayName": "Nano Banana Image Generator",
+  "description": "Generate images in VS Code using Gemini API, with article-cover prompt generation via GitHub Copilot Language Model API.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:nanoBanana.generateFromSelection",
+    "onCommand:nanoBanana.generateFreeform",
+    "onCommand:nanoBanana.setGeminiApiKey"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "nanoBanana.generateFromSelection",
+        "title": "使用 Nano Banana Pro 生圖"
+      },
+      {
+        "command": "nanoBanana.generateFreeform",
+        "title": "Nano Banana: 任意生圖"
+      },
+      {
+        "command": "nanoBanana.setGeminiApiKey",
+        "title": "Nano Banana: 設定 Gemini API Key"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "nanoBanana.generateFromSelection",
+          "when": "editorTextFocus",
+          "group": "navigation@100"
+        }
+      ]
+    },
+    "configuration": {
+      "type": "object",
+      "title": "Nano Banana",
+      "properties": {
+        "nanoBanana.modelId": {
+          "type": "string",
+          "default": "gemini-3-pro-image-preview",
+          "description": "Gemini image model ID. Supports legacy alias gpt-3-pro-image-preview."
+        },
+        "nanoBanana.geminiApiBaseUrl": {
+          "type": "string",
+          "default": "https://generativelanguage.googleapis.com/v1beta",
+          "description": "Gemini API base URL."
+        },
+        "nanoBanana.copilotPromptModel": {
+          "type": "string",
+          "default": "gpt-4.1",
+          "description": "Preferred Copilot model id/family for prompt generation."
+        },
+        "nanoBanana.imageOutputFormat": {
+          "type": "string",
+          "enum": [
+            "png"
+          ],
+          "default": "png",
+          "description": "Output image format for saved files."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/vscode": "^1.109.0",
+    "esbuild": "^0.25.9",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
