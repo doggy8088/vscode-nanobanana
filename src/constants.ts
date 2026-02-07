@@ -10,16 +10,29 @@ export const CONFIG_KEYS = {
   modelId: 'modelId',
   geminiApiBaseUrl: 'geminiApiBaseUrl',
   copilotPromptModel: 'copilotPromptModel',
-  imageOutputFormat: 'imageOutputFormat'
+  imageOutputFormat: 'imageOutputFormat',
+  defaultStyle: 'defaultStyle',
+  rememberLastStyle: 'rememberLastStyle',
+  defaultAspectRatio: 'defaultAspectRatio',
+  rememberLastAspectRatio: 'rememberLastAspectRatio'
 } as const;
 
 export const DEFAULTS = {
   modelId: 'gemini-3-pro-image-preview',
   geminiApiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
   copilotPromptModel: 'gpt-4.1',
-  imageOutputFormat: 'png'
+  imageOutputFormat: 'png',
+  defaultStyle: 'article-cover',
+  rememberLastStyle: true,
+  defaultAspectRatio: '1:1',
+  rememberLastAspectRatio: true
 } as const;
 
 export const SECRETS = {
   geminiApiKey: 'nanoBanana.geminiApiKey'
+} as const;
+
+export const WORKSPACE_STATE_KEYS = {
+  lastStyleId: 'nanoBanana.lastStyleId',
+  lastAspectRatio: 'nanoBanana.lastAspectRatio'
 } as const;

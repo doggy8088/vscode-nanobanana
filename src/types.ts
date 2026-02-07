@@ -1,6 +1,10 @@
 export interface CoverPromptRequest {
   sourceText: string;
   locale: 'zh-TW';
+  styleLabel: string;
+  styleDirectives: string;
+  textPolicyInstruction: string;
+  aspectRatio: string;
 }
 
 export interface GeminiInlineData {

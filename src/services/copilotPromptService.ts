@@ -8,7 +8,8 @@ const COVER_PROMPT_SYSTEM_INSTRUCTION = [
   '任務：把使用者提供的文章內容，轉成「文章封面圖」專用的高品質生圖提示詞。',
   '輸出格式要求：只輸出最終提示詞本體，不要加標題、編號、說明、引號。',
   '提示詞內容需包含：主題、構圖、鏡頭視角、光線、色彩風格、材質/細節、整體氛圍。',
-  '並加入限制：無文字、無浮水印、無 logo、無扭曲、無低清晰度、無多餘肢體。',
+  '你必須遵守使用者提供的 Style directives、Text policy、Aspect ratio。',
+  '避免無關元素、扭曲、低清晰度、多餘肢體。',
   '請輸出英文提示詞，長度約 80-180 字。'
 ].join('\n');
 
@@ -22,7 +23,16 @@ export class CopilotPromptService {
 
     const messages = [
       vscode.LanguageModelChatMessage.User(COVER_PROMPT_SYSTEM_INSTRUCTION),
-      vscode.LanguageModelChatMessage.User(`文章內容：\n${request.sourceText}`)
+      vscode.LanguageModelChatMessage.User(
+        [
+          `文章內容：\n${request.sourceText}`,
+          '',
+          `Style: ${request.styleLabel}`,
+          `Style directives: ${request.styleDirectives}`,
+          `Aspect ratio: ${request.aspectRatio}`,
+          `Text policy: ${request.textPolicyInstruction}`
+        ].join('\n')
+      )
     ];
 
     let content = '';

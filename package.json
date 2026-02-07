@@ -66,6 +66,38 @@
           ],
           "default": "png",
           "description": "Output image format for saved files."
+        },
+        "nanoBanana.defaultStyle": {
+          "type": "string",
+          "default": "article-cover",
+          "description": "Default image style preset id."
+        },
+        "nanoBanana.rememberLastStyle": {
+          "type": "boolean",
+          "default": true,
+          "description": "Remember last selected style in workspace."
+        },
+        "nanoBanana.defaultAspectRatio": {
+          "type": "string",
+          "enum": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9"
+          ],
+          "default": "1:1",
+          "description": "Default aspect ratio for image generation."
+        },
+        "nanoBanana.rememberLastAspectRatio": {
+          "type": "boolean",
+          "default": true,
+          "description": "Remember last selected aspect ratio in workspace."
         }
       }
     }

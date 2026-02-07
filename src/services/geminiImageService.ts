@@ -1,11 +1,13 @@
 import { UserFacingError } from '../errors';
 import { GeneratedImagePayload, GeminiGenerateResponse, GeminiPart } from '../types';
 import { GeminiApiKeyProvider } from './apiKeyStore';
+import { isSupportedAspectRatio } from './stylePresets';
 
 interface GeminiGenerateOptions {
   prompt: string;
   modelId: string;
   baseUrl: string;
+  aspectRatio?: string;
 }
 
 interface LoggerLike {
@@ -13,6 +15,7 @@ interface LoggerLike {
 }
 
 type FetchLike = typeof fetch;
+const FIXED_IMAGE_SIZE = '1K';
 
 const LEGACY_MODEL_ALIASES: Record<string, string> = {
   'gpt-3-pro-image-preview': 'gemini-3-pro-image-preview',
@@ -53,7 +56,8 @@ export class GeminiImageService {
         }
       ],
       generationConfig: {
-        responseModalities: ['IMAGE']
+        responseModalities: ['IMAGE'],
+        ...buildImageConfig(options.aspectRatio)
       }
     };
 
@@ -147,4 +151,18 @@ function normalizeModelId(modelId: string): string {
 function resolveModelAlias(modelId: string): string {
   const lower = modelId.toLowerCase();
   return LEGACY_MODEL_ALIASES[lower] ?? modelId;
+}
+
+function buildImageConfig(aspectRatio: string | undefined): {
+  imageConfig: { imageSize: typeof FIXED_IMAGE_SIZE; aspectRatio?: string };
+} {
+  const normalized = aspectRatio?.trim();
+  const resolvedAspectRatio = normalized && isSupportedAspectRatio(normalized) ? normalized : undefined;
+
+  return {
+    imageConfig: {
+      imageSize: FIXED_IMAGE_SIZE,
+      ...(resolvedAspectRatio ? { aspectRatio: resolvedAspectRatio } : {})
+    }
+  };
 }

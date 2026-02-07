@@ -7,6 +7,9 @@ A VS Code extension that generates images via Gemini API.
 - Right-click command in editor: `使用 Nano Banana Pro 生圖`
 - Command to set Gemini API Key securely
 - Command for freeform image generation
+- Style picker before generation (12 built-in styles)
+- Aspect ratio picker before generation
+- Gemini image size is fixed to `1K`
 - Uses VS Code GitHub Copilot Language Model API to build article-cover prompts
 
 ## Commands
@@ -21,6 +24,10 @@ A VS Code extension that generates images via Gemini API.
 - `nanoBanana.geminiApiBaseUrl` (default: `https://generativelanguage.googleapis.com/v1beta`)
 - `nanoBanana.copilotPromptModel` (default: `gpt-4.1`)
 - `nanoBanana.imageOutputFormat` (default: `png`)
+- `nanoBanana.defaultStyle` (default: `article-cover`)
+- `nanoBanana.rememberLastStyle` (default: `true`)
+- `nanoBanana.defaultAspectRatio` (default: `1:1`)
+- `nanoBanana.rememberLastAspectRatio` (default: `true`)
 
 ## Development
 
