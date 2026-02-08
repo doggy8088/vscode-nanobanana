@@ -1,11 +1,11 @@
 {
-  "extension.displayName": "Nano Banana Pro 画像ジェネレーター",
+  "extension.displayName": "Nano Banana 画像ジェネレーター",
   "extension.description": "VS Code 上で Gemini API による画像生成を行い、GitHub Copilot Language Model API でプロンプトを生成します。",
   "command.generateFromSelection.title": "Nano Banana Pro で画像生成",
   "command.generateFreeform.title": "Nano Banana: 自由入力で画像生成",
   "command.setGeminiApiKey.title": "Nano Banana: Gemini API Key を設定",
   "config.title": "Nano Banana",
-  "config.modelId.description": "Gemini 画像生成モデル ID。旧エイリアス gpt-3-pro-image-preview に対応。",
+  "config.modelId.description": "Gemini 画像生成モデル ID。",
   "config.geminiApiBaseUrl.description": "Gemini API のベース URL。",
   "config.copilotPromptModel.description": "プロンプト生成で優先する Copilot モデル ID/family。",
   "config.imageOutputFormat.description": "保存する画像の出力形式。",

@@ -53,7 +53,7 @@
       "properties": {
         "nanoBanana.modelId": {
           "type": "string",
-          "default": "gemini-3-pro-image-preview",
+          "default": "gpt-3-pro-image-preview",
           "description": "%config.modelId.description%"
         },
         "nanoBanana.geminiApiBaseUrl": {

@@ -17,11 +17,6 @@ interface LoggerLike {
 type FetchLike = typeof fetch;
 const FIXED_IMAGE_SIZE = '1K';
 
-const LEGACY_MODEL_ALIASES: Record<string, string> = {
-  'gpt-3-pro-image-preview': 'gemini-3-pro-image-preview',
-  'gpt-2.5-flash-image': 'gemini-2.5-flash-image'
-};
-
 export type Translator = (key: string, vars?: Record<string, string | number>) => string;
 
 const DEFAULT_TRANSLATOR: Translator = (key, vars) => {
@@ -32,7 +27,6 @@ const DEFAULT_TRANSLATOR: Translator = (key, vars) => {
     'error.geminiFailed': 'Gemini API failed ({status}): {message}',
     'error.geminiNoImage': 'Gemini did not return image data.',
     'error.geminiNetwork': 'Unable to reach Gemini API: {detail}',
-    'log.geminiModelAliasApplied': 'Gemini model alias applied => {requested} -> {resolved}',
     'log.geminiRequestModel': 'Gemini request => model={modelId}',
     'log.geminiRetryStatus': 'Gemini returned {status}; retrying once.',
     'log.geminiRetryOnce': 'Gemini request failed on first attempt; retrying once.'
@@ -65,19 +59,9 @@ export class GeminiImageService {
       throw new UserFacingError(t('error.noGeminiApiKey'));
     }
 
-    const requestedModelId = normalizeModelId(options.modelId);
-    const modelId = resolveModelAlias(requestedModelId);
+    const modelId = normalizeModelId(options.modelId);
     if (!modelId) {
       throw new UserFacingError(t('error.modelIdEmpty'));
-    }
-
-    if (requestedModelId !== modelId) {
-      this.logger?.appendLine(
-        t('log.geminiModelAliasApplied', {
-          requested: requestedModelId,
-          resolved: modelId
-        })
-      );
     }
 
     const base = options.baseUrl.replace(/\/+$/, '');
@@ -195,11 +179,6 @@ export class GeminiImageService {
 function normalizeModelId(modelId: string): string {
   const normalized = modelId.trim().replace(/^models\//i, '');
   return normalized;
-}
-
-function resolveModelAlias(modelId: string): string {
-  const lower = modelId.toLowerCase();
-  return LEGACY_MODEL_ALIASES[lower] ?? modelId;
 }
 
 function buildImageConfig(aspectRatio: string | undefined): {

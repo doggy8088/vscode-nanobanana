@@ -1,11 +1,11 @@
 {
-  "extension.displayName": "Nano Banana Pro Trình tạo ảnh",
+  "extension.displayName": "Nano Banana Trình tạo ảnh",
   "extension.description": "Tạo ảnh trong VS Code bằng Gemini API và tạo prompt bằng GitHub Copilot Language Model API.",
   "command.generateFromSelection.title": "Tạo ảnh với Nano Banana Pro",
   "command.generateFreeform.title": "Nano Banana: Tạo ảnh tự do",
   "command.setGeminiApiKey.title": "Nano Banana: Thiết lập Gemini API Key",
   "config.title": "Nano Banana",
-  "config.modelId.description": "Model ID tạo ảnh Gemini. Hỗ trợ alias cũ gpt-3-pro-image-preview.",
+  "config.modelId.description": "Model ID tạo ảnh Gemini.",
   "config.geminiApiBaseUrl.description": "Base URL của Gemini API.",
   "config.copilotPromptModel.description": "Model ID/family Copilot ưu tiên khi tạo prompt.",
   "config.imageOutputFormat.description": "Định dạng ảnh đầu ra khi lưu.",

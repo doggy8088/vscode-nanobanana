@@ -16,7 +16,7 @@ describe('GeminiImageService', () => {
     ).rejects.toThrow('Gemini API Key is not set');
   });
 
-  it('maps legacy gpt model id to gemini id and returns decoded image bytes', async () => {
+  it('uses gpt-3-pro-image-preview as-is and returns decoded image bytes', async () => {
     const body = {
       candidates: [
         {
@@ -59,7 +59,7 @@ describe('GeminiImageService', () => {
     expect(result.bytes.toString('utf8')).toBe('hello');
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe(
-      'https://example.com/models/gemini-3-pro-image-preview:generateContent'
+      'https://example.com/models/gpt-3-pro-image-preview:generateContent'
     );
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     const requestBody = JSON.parse(String(init.body));

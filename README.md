@@ -1,4 +1,4 @@
-# Nano Banana Pro Image Generator
+# Nano Banana Image Generator
 
 A VS Code extension that generates images with Gemini API.
 It can build article-cover prompts through the GitHub Copilot Language Model API, then generate and open the output image in VS Code.
@@ -41,7 +41,7 @@ Language behavior:
 
 ## Settings
 
-- `nanoBanana.modelId` (default: `gemini-3-pro-image-preview`, supports legacy alias `gpt-3-pro-image-preview`)
+- `nanoBanana.modelId` (default: `gpt-3-pro-image-preview`)
 - `nanoBanana.geminiApiBaseUrl` (default: `https://generativelanguage.googleapis.com/v1beta`)
 - `nanoBanana.copilotPromptModel` (default: `gpt-4.1`)
 - `nanoBanana.imageOutputFormat` (default: `png`)

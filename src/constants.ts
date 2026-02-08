@@ -19,7 +19,7 @@ export const CONFIG_KEYS = {
 } as const;
 
 export const DEFAULTS = {
-  modelId: 'gemini-3-pro-image-preview',
+  modelId: 'gpt-3-pro-image-preview',
   geminiApiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
   copilotPromptModel: 'gpt-4.1',
   imageOutputFormat: 'png',

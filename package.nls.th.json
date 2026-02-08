@@ -1,11 +1,11 @@
 {
-  "extension.displayName": "Nano Banana Pro ตัวสร้างภาพ",
+  "extension.displayName": "Nano Banana ตัวสร้างภาพ",
   "extension.description": "สร้างภาพใน VS Code ด้วย Gemini API และสร้างพรอมป์ต์ด้วย GitHub Copilot Language Model API",
   "command.generateFromSelection.title": "สร้างภาพด้วย Nano Banana Pro",
   "command.generateFreeform.title": "Nano Banana: สร้างภาพแบบกำหนดเอง",
   "command.setGeminiApiKey.title": "Nano Banana: ตั้งค่า Gemini API Key",
   "config.title": "Nano Banana",
-  "config.modelId.description": "รหัสโมเดลภาพของ Gemini รองรับ alias เก่า gpt-3-pro-image-preview",
+  "config.modelId.description": "รหัสโมเดลภาพของ Gemini",
   "config.geminiApiBaseUrl.description": "Base URL ของ Gemini API",
   "config.copilotPromptModel.description": "Copilot model ID/family ที่ต้องการใช้เป็นลำดับแรกสำหรับสร้างพรอมป์ต์",
   "config.imageOutputFormat.description": "รูปแบบไฟล์ภาพที่บันทึก",

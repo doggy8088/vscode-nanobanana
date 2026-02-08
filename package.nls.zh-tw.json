@@ -1,11 +1,11 @@
 {
-  "extension.displayName": "Nano Banana Pro 生圖工具",
+  "extension.displayName": "Nano Banana 圖片產生器",
   "extension.description": "在 VS Code 中透過 Gemini API 生圖，並使用 GitHub Copilot Language Model API 生成提示詞。",
   "command.generateFromSelection.title": "使用 Nano Banana Pro 生圖",
   "command.generateFreeform.title": "Nano Banana：任意生圖",
   "command.setGeminiApiKey.title": "Nano Banana：設定 Gemini API Key",
   "config.title": "Nano Banana",
-  "config.modelId.description": "Gemini 生圖模型 ID。支援舊別名 gpt-3-pro-image-preview。",
+  "config.modelId.description": "Gemini 生圖模型 ID。",
   "config.geminiApiBaseUrl.description": "Gemini API 基底網址。",
   "config.copilotPromptModel.description": "提示詞生成時優先使用的 Copilot 模型 ID/family。",
   "config.imageOutputFormat.description": "儲存圖片的輸出格式。",
