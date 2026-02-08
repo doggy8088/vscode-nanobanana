@@ -28,6 +28,9 @@ import {
   textPolicyInstruction
 } from './services/stylePresets';
 
+const IMAGE_SIZE_OPTIONS = ['1K', '2K', '4K'] as const;
+type ImageSizeOption = (typeof IMAGE_SIZE_OPTIONS)[number];
+
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel('Nano Banana');
   context.subscriptions.push(output);
@@ -146,6 +149,11 @@ export function activate(context: vscode.ExtensionContext): void {
           return;
         }
 
+        const imageSize = await pickImageSize(config.imageSize, i18n.t);
+        if (!imageSize) {
+          return;
+        }
+
         const referenceImageBytes = await vscode.workspace.fs.readFile(imageUri);
         const editPrompt = buildReferenceEditPrompt(instruction);
 
@@ -153,7 +161,7 @@ export function activate(context: vscode.ExtensionContext): void {
           mode: 'edit',
           styleLabel: '-',
           aspectRatio: '-',
-          imageSize: config.imageSize,
+          imageSize,
           modelId: config.modelId,
           prompt: editPrompt
         });
@@ -173,7 +181,7 @@ export function activate(context: vscode.ExtensionContext): void {
                   prompt: editPrompt,
                   modelId: config.modelId,
                   baseUrl: config.geminiApiBaseUrl,
-                  imageSize: config.imageSize,
+                  imageSize,
                   referenceImages: [{ bytes: referenceImageBytes, mimeType }]
                 },
                 i18n.t,
@@ -223,6 +231,11 @@ export function activate(context: vscode.ExtensionContext): void {
           return;
         }
 
+        const initialImageSize = await pickImageSize(config.imageSize, i18n.t);
+        if (!initialImageSize) {
+          return;
+        }
+
         const editor = vscode.window.activeTextEditor;
         const selectedText = editor?.document.getText(editor.selection).trim() ?? '';
 
@@ -260,7 +273,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 mode: 'selection',
                 styleLabel,
                 aspectRatio,
-                imageSize: config.imageSize,
+                imageSize: initialImageSize,
                 modelId: config.modelId,
                 prompt: promptResult.prompt
               });
@@ -273,7 +286,7 @@ export function activate(context: vscode.ExtensionContext): void {
                   prompt: promptResult.prompt,
                   modelId: config.modelId,
                   baseUrl: config.geminiApiBaseUrl,
-                  imageSize: config.imageSize,
+                  imageSize: initialImageSize,
                   aspectRatio
                 },
                 i18n.t,
@@ -296,9 +309,15 @@ export function activate(context: vscode.ExtensionContext): void {
         );
 
         let latestImagePayload = initialGeneration.imagePayload;
+        let latestImageSize: ImageSizeOption = initialImageSize;
         while (true) {
           const finalDirection = await requestOptionalInputText(i18n.t('input.finalDirectionPrompt'), i18n.t);
           if (!finalDirection) {
+            break;
+          }
+
+          const refineImageSize = await pickImageSize(latestImageSize, i18n.t);
+          if (!refineImageSize) {
             break;
           }
 
@@ -310,7 +329,7 @@ export function activate(context: vscode.ExtensionContext): void {
             mode: 'selection-refine',
             styleLabel: initialGeneration.styleLabel,
             aspectRatio: initialGeneration.aspectRatio,
-            imageSize: config.imageSize,
+            imageSize: refineImageSize,
             modelId: config.modelId,
             prompt: refinementPrompt
           });
@@ -330,7 +349,7 @@ export function activate(context: vscode.ExtensionContext): void {
                     prompt: refinementPrompt,
                     modelId: config.modelId,
                     baseUrl: config.geminiApiBaseUrl,
-                    imageSize: config.imageSize,
+                    imageSize: refineImageSize,
                     aspectRatio: initialGeneration.aspectRatio,
                     referenceImages: [
                       {
@@ -355,6 +374,7 @@ export function activate(context: vscode.ExtensionContext): void {
           await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(refinedFilePath));
           vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: refinedFilePath }));
           latestImagePayload = refinedImagePayload;
+          latestImageSize = refineImageSize;
         }
       }, output);
     })
@@ -475,6 +495,27 @@ async function pickAspectRatio(
   }
 
   return picked.aspectRatio;
+}
+
+async function pickImageSize(
+  configuredDefaultImageSize: string,
+  t: (key: string, vars?: Record<string, string | number>) => string
+): Promise<ImageSizeOption | undefined> {
+  const defaultImageSize = normalizeImageSize(configuredDefaultImageSize);
+  const items = IMAGE_SIZE_OPTIONS.map((size) => ({
+    label: size,
+    description: size === defaultImageSize ? t('quickpick.default') : '',
+    picked: size === defaultImageSize,
+    imageSize: size
+  }));
+
+  const picked = await vscode.window.showQuickPick(items, {
+    title: t('quickpick.imageSize.title'),
+    placeHolder: t('quickpick.imageSize.placeholder'),
+    ignoreFocusOut: true
+  });
+
+  return picked?.imageSize;
 }
 
 function readRuntimeConfig() {
@@ -660,6 +701,11 @@ function resolveSupportedImageMimeType(uri: vscode.Uri): string | undefined {
   }
 
   return undefined;
+}
+
+function normalizeImageSize(value: string | undefined): ImageSizeOption {
+  const normalized = value?.trim().toUpperCase();
+  return IMAGE_SIZE_OPTIONS.includes(normalized as ImageSizeOption) ? (normalized as ImageSizeOption) : '1K';
 }
 
 function logImageGenerationDebug(
