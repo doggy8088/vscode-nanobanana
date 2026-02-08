@@ -232,8 +232,7 @@ export function activate(context: vscode.ExtensionContext): void {
         }
 
         const styleLabel = i18n.t(`style.${style.id}.label`);
-
-        await vscode.window.withProgress(
+        const initialGeneration = await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,
             title: i18n.t('progress.generating'),
@@ -257,19 +256,13 @@ export function activate(context: vscode.ExtensionContext): void {
                 token
               );
 
-              const finalDirection = await requestOptionalInputText(
-                i18n.t('input.finalDirectionPrompt'),
-                i18n.t
-              );
-              const finalPrompt = mergePromptWithFinalDirection(promptResult.prompt, finalDirection);
-
               logImageGenerationDebug(output, i18n.t, {
                 mode: 'selection',
                 styleLabel,
                 aspectRatio,
                 imageSize: config.imageSize,
                 modelId: config.modelId,
-                prompt: finalPrompt
+                prompt: promptResult.prompt
               });
 
               output.appendLine(i18n.t('log.copilotModelSelected', { modelId: promptResult.modelId }));
@@ -277,7 +270,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
               const imagePayload = await geminiService.generateImage(
                 {
-                  prompt: finalPrompt,
+                  prompt: promptResult.prompt,
                   modelId: config.modelId,
                   baseUrl: config.geminiApiBaseUrl,
                   imageSize: config.imageSize,
@@ -290,11 +283,79 @@ export function activate(context: vscode.ExtensionContext): void {
               const filePath = await fileService.saveToTemp(imagePayload, config.imageOutputFormat);
               await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
               vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: filePath }));
+              return {
+                imagePayload,
+                styleLabel,
+                aspectRatio,
+                prompt: promptResult.prompt
+              };
             } finally {
               abortBridge.dispose();
             }
           }
         );
+
+        let latestImagePayload = initialGeneration.imagePayload;
+        while (true) {
+          const finalDirection = await requestOptionalInputText(i18n.t('input.finalDirectionPrompt'), i18n.t);
+          if (!finalDirection) {
+            break;
+          }
+
+          const refinementPrompt = buildGeneratedImageRefinementPrompt(
+            initialGeneration.prompt,
+            finalDirection
+          );
+          logImageGenerationDebug(output, i18n.t, {
+            mode: 'selection-refine',
+            styleLabel: initialGeneration.styleLabel,
+            aspectRatio: initialGeneration.aspectRatio,
+            imageSize: config.imageSize,
+            modelId: config.modelId,
+            prompt: refinementPrompt
+          });
+
+          const refinedImagePayload = await vscode.window.withProgress(
+            {
+              location: vscode.ProgressLocation.Notification,
+              title: i18n.t('progress.editing'),
+              cancellable: true
+            },
+            async (_, token) => {
+              throwIfCancelled(token, i18n.t);
+              const abortBridge = createAbortBridge(token);
+              try {
+                return await geminiService.generateImage(
+                  {
+                    prompt: refinementPrompt,
+                    modelId: config.modelId,
+                    baseUrl: config.geminiApiBaseUrl,
+                    imageSize: config.imageSize,
+                    aspectRatio: initialGeneration.aspectRatio,
+                    referenceImages: [
+                      {
+                        bytes: latestImagePayload.bytes,
+                        mimeType: latestImagePayload.mimeType
+                      }
+                    ]
+                  },
+                  i18n.t,
+                  abortBridge.signal
+                );
+              } finally {
+                abortBridge.dispose();
+              }
+            }
+          );
+
+          const refinedFilePath = await fileService.saveToTemp(
+            refinedImagePayload,
+            config.imageOutputFormat
+          );
+          await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(refinedFilePath));
+          vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: refinedFilePath }));
+          latestImagePayload = refinedImagePayload;
+        }
       }, output);
     })
   );
@@ -515,16 +576,14 @@ function createAbortBridge(token: vscode.CancellationToken): { signal: AbortSign
   };
 }
 
-function mergePromptWithFinalDirection(basePrompt: string, finalDirection: string | undefined): string {
-  if (!finalDirection) {
-    return basePrompt;
-  }
-
+function buildGeneratedImageRefinementPrompt(basePrompt: string, finalDirection: string): string {
   return [
-    basePrompt,
+    'Edit the reference image according to the refinement instruction.',
+    'Preserve the current subject identity and core composition unless the user asks to change them.',
+    'Maintain high image quality and avoid artifacts, logos, and watermarks.',
     '',
-    'Additional user direction (must follow):',
-    finalDirection
+    `Original intent: ${basePrompt}`,
+    `Refinement instruction: ${finalDirection}`
   ].join('\n');
 }
 
@@ -607,7 +666,7 @@ function logImageGenerationDebug(
   output: vscode.OutputChannel,
   t: (key: string, vars?: Record<string, string | number>) => string,
   params: {
-    mode: 'selection' | 'edit';
+    mode: 'selection' | 'selection-refine' | 'edit';
     styleLabel: string;
     aspectRatio: string;
     imageSize: string;

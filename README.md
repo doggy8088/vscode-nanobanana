@@ -8,6 +8,7 @@ It can build article-cover prompts through the GitHub Copilot Language Model API
 ## Features
 
 - Right-click command from editor selection: **Generate Image with Nano Banana Pro**
+  - Optional final refinement step: edit the just-generated image with an extra instruction (reference image based)
 - Right-click on image (`.png`, `.jpg`, `.jpeg`) in Editor or Explorer: **Edit Image with Nano Banana Pro**
 - Secure Gemini API key storage (`SecretStorage`)
 - Style picker (12 built-in styles)
