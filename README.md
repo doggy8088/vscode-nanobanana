@@ -13,6 +13,7 @@ Publish guide: `docs/vscode-publish.md`
 - Style picker (12 built-in styles)
 - Aspect ratio picker
 - Fixed image size: `1K`
+- Cancellable generation progress UI
 - Prompt generation with VS Code Copilot LM API (`vscode.lm`)
 - Runtime i18n for extension messages
 

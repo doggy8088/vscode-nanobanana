@@ -1,4 +1,4 @@
-import { UserFacingError } from '../errors';
+import { OperationCancelledError, UserFacingError } from '../errors';
 import { GeneratedImagePayload, GeminiGenerateResponse, GeminiPart } from '../types';
 import { GeminiApiKeyProvider } from './apiKeyStore';
 import { isSupportedAspectRatio } from './stylePresets';
@@ -24,6 +24,7 @@ const DEFAULT_TRANSLATOR: Translator = (key, vars) => {
     'error.noGeminiApiKey':
       'Gemini API Key is not set. Run "Nano Banana: Set Gemini API Key" first.',
     'error.modelIdEmpty': 'modelId is empty. Update nanoBanana.modelId in settings.',
+    'error.operationCancelled': 'Operation cancelled.',
     'error.geminiFailed': 'Gemini API failed ({status}): {message}',
     'error.geminiNoImage': 'Gemini did not return image data.',
     'error.geminiNetwork': 'Unable to reach Gemini API: {detail}',
@@ -52,8 +53,13 @@ export class GeminiImageService {
 
   async generateImage(
     options: GeminiGenerateOptions,
-    t: Translator = DEFAULT_TRANSLATOR
+    t: Translator = DEFAULT_TRANSLATOR,
+    abortSignal?: AbortSignal
   ): Promise<GeneratedImagePayload> {
+    if (abortSignal?.aborted) {
+      throw new OperationCancelledError(t('error.operationCancelled'));
+    }
+
     const apiKey = await this.apiKeyProvider.getGeminiApiKey();
     if (!apiKey) {
       throw new UserFacingError(t('error.noGeminiApiKey'));
@@ -81,7 +87,7 @@ export class GeminiImageService {
     };
 
     this.logger?.appendLine(t('log.geminiRequestModel', { modelId }));
-    const response = await this.sendWithRetry(url, apiKey, requestBody, t);
+    const response = await this.sendWithRetry(url, apiKey, requestBody, t, abortSignal);
 
     if (!response.ok) {
       const message = await this.readErrorMessage(response);
@@ -116,21 +122,32 @@ export class GeminiImageService {
     url: string,
     apiKey: string,
     body: unknown,
-    t: Translator
+    t: Translator,
+    abortSignal?: AbortSignal
   ): Promise<Response> {
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
+      if (abortSignal?.aborted) {
+        throw new OperationCancelledError(t('error.operationCancelled'));
+      }
+
       try {
-        const response = await this.fetchImpl(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
-          },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(60_000)
-        });
+        const { signal, cleanup } = composeAbortSignal(abortSignal, 60_000);
+        let response: Response;
+        try {
+          response = await this.fetchImpl(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey
+            },
+            body: JSON.stringify(body),
+            signal
+          });
+        } finally {
+          cleanup();
+        }
 
         if (attempt === 1 && response.status >= 500) {
           this.logger?.appendLine(t('log.geminiRetryStatus', { status: response.status }));
@@ -139,6 +156,10 @@ export class GeminiImageService {
 
         return response;
       } catch (error) {
+        if (abortSignal?.aborted) {
+          throw new OperationCancelledError(t('error.operationCancelled'));
+        }
+
         lastError = error;
         if (attempt === 2) {
           break;
@@ -174,6 +195,33 @@ export class GeminiImageService {
       .map((part: GeminiPart) => part.inlineData ?? part.inline_data)
       .find((inlineData) => Boolean(inlineData?.data));
   }
+}
+
+function composeAbortSignal(
+  sourceSignal: AbortSignal | undefined,
+  timeoutMs: number
+): { signal: AbortSignal; cleanup: () => void } {
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  if (!sourceSignal) {
+    return { signal: timeoutSignal, cleanup: () => {} };
+  }
+
+  if (sourceSignal.aborted) {
+    return { signal: sourceSignal, cleanup: () => {} };
+  }
+
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  sourceSignal.addEventListener('abort', onAbort);
+  timeoutSignal.addEventListener('abort', onAbort);
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      sourceSignal.removeEventListener('abort', onAbort);
+      timeoutSignal.removeEventListener('abort', onAbort);
+    }
+  };
 }
 
 function normalizeModelId(modelId: string): string {

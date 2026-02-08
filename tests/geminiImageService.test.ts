@@ -157,4 +157,32 @@ describe('GeminiImageService', () => {
     expect(requestBody.generationConfig.imageConfig.imageSize).toBe('1K');
     expect(requestBody.generationConfig.imageConfig.aspectRatio).toBe('16:9');
   });
+
+  it('honors external cancellation signal before request starts', async () => {
+    const fetchMock = vi.fn();
+    const service = new GeminiImageService(
+      {
+        getGeminiApiKey: async () => 'secret'
+      },
+      undefined,
+      fetchMock as unknown as typeof fetch
+    );
+
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      service.generateImage(
+        {
+          prompt: 'cover image',
+          modelId: 'gpt-3-pro-image-preview',
+          baseUrl: 'https://example.com/'
+        },
+        undefined,
+        controller.signal
+      )
+    ).rejects.toThrow('Operation cancelled');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

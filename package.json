@@ -17,6 +17,14 @@
   "categories": [
     "Other"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": {
+      "supported": true
+    }
+  },
   "activationEvents": [
     "onCommand:nanoBanana.generateFromSelection",
     "onCommand:nanoBanana.generateFreeform",
@@ -136,6 +144,7 @@
   },
   "scripts": {
     "build": "node esbuild.js",
+    "vscode:prepublish": "npm run build",
     "watch": "node esbuild.js --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -145,7 +154,7 @@
   "devDependencies": {
     "@vscode/vsce": "^3.6.2",
     "@types/node": "^24.3.0",
-    "@types/vscode": "^1.109.0",
+    "@types/vscode": "^1.108.0",
     "esbuild": "^0.25.9",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"

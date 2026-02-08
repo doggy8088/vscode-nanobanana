@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { getExtensionConfig } from './config';
 import { COMMANDS, CONFIG_KEYS, DEFAULTS, WORKSPACE_STATE_KEYS } from './constants';
-import { UserFacingError } from './errors';
+import { OperationCancelledError, UserFacingError } from './errors';
 import { createRuntimeI18n } from './i18n';
 import { ApiKeyStore } from './services/apiKeyStore';
 import { CopilotPromptService } from './services/copilotPromptService';
@@ -95,36 +95,46 @@ export function activate(context: vscode.ExtensionContext): void {
           {
             location: vscode.ProgressLocation.Notification,
             title: i18n.t('progress.generating'),
-            cancellable: false
+            cancellable: true
           },
-          async () => {
-            const promptResult = await promptService.generateCoverPrompt(
-              {
-                sourceText,
-                locale: i18n.locale,
-                styleLabel,
-                styleDirectives: style.promptDirectives,
-                textPolicyInstruction: textPolicyInstruction(style.textPolicy),
-                aspectRatio
-              },
-              config.copilotPromptModel,
-              i18n.t
-            );
+          async (_, token) => {
+            throwIfCancelled(token, i18n.t);
+            const abortBridge = createAbortBridge(token);
+            try {
+              const promptResult = await promptService.generateCoverPrompt(
+                {
+                  sourceText,
+                  locale: i18n.locale,
+                  styleLabel,
+                  styleDirectives: style.promptDirectives,
+                  textPolicyInstruction: textPolicyInstruction(style.textPolicy),
+                  aspectRatio
+                },
+                config.copilotPromptModel,
+                i18n.t,
+                token
+              );
 
-            output.appendLine(i18n.t('log.copilotModelSelected', { modelId: promptResult.modelId }));
-            const imagePayload = await geminiService.generateImage(
-              {
-                prompt: promptResult.prompt,
-                modelId: config.modelId,
-                baseUrl: config.geminiApiBaseUrl,
-                aspectRatio
-              },
-              i18n.t
-            );
+              output.appendLine(i18n.t('log.copilotModelSelected', { modelId: promptResult.modelId }));
+              throwIfCancelled(token, i18n.t);
 
-            const filePath = await fileService.saveToTemp(imagePayload, config.imageOutputFormat);
-            await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
-            vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: filePath }));
+              const imagePayload = await geminiService.generateImage(
+                {
+                  prompt: promptResult.prompt,
+                  modelId: config.modelId,
+                  baseUrl: config.geminiApiBaseUrl,
+                  aspectRatio
+                },
+                i18n.t,
+                abortBridge.signal
+              );
+
+              const filePath = await fileService.saveToTemp(imagePayload, config.imageOutputFormat);
+              await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
+              vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: filePath }));
+            } finally {
+              abortBridge.dispose();
+            }
           }
         );
       }, output);
@@ -169,22 +179,29 @@ export function activate(context: vscode.ExtensionContext): void {
           {
             location: vscode.ProgressLocation.Notification,
             title: i18n.t('progress.generating'),
-            cancellable: false
+            cancellable: true
           },
-          async () => {
-            const imagePayload = await geminiService.generateImage(
-              {
-                prompt: enhancedPrompt,
-                modelId: config.modelId,
-                baseUrl: config.geminiApiBaseUrl,
-                aspectRatio
-              },
-              i18n.t
-            );
+          async (_, token) => {
+            throwIfCancelled(token, i18n.t);
+            const abortBridge = createAbortBridge(token);
+            try {
+              const imagePayload = await geminiService.generateImage(
+                {
+                  prompt: enhancedPrompt,
+                  modelId: config.modelId,
+                  baseUrl: config.geminiApiBaseUrl,
+                  aspectRatio
+                },
+                i18n.t,
+                abortBridge.signal
+              );
 
-            const filePath = await fileService.saveToTemp(imagePayload, config.imageOutputFormat);
-            await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
-            vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: filePath }));
+              const filePath = await fileService.saveToTemp(imagePayload, config.imageOutputFormat);
+              await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
+              vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: filePath }));
+            } finally {
+              abortBridge.dispose();
+            }
           }
         );
       }, output);
@@ -331,8 +348,32 @@ async function executeSafely(handler: () => Promise<void>, output: vscode.Output
   try {
     await handler();
   } catch (error) {
+    if (error instanceof OperationCancelledError) {
+      output.appendLine(error.message);
+      return;
+    }
+
     const message = error instanceof Error ? error.message : String(error);
-    output.appendLine(message);
+    const detail = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    output.appendLine(detail);
     vscode.window.showErrorMessage(message);
   }
+}
+
+function throwIfCancelled(
+  token: vscode.CancellationToken,
+  t: (key: string, vars?: Record<string, string | number>) => string
+): void {
+  if (token.isCancellationRequested) {
+    throw new OperationCancelledError(t('error.operationCancelled'));
+  }
+}
+
+function createAbortBridge(token: vscode.CancellationToken): { signal: AbortSignal; dispose: () => void } {
+  const controller = new AbortController();
+  const disposable = token.onCancellationRequested(() => controller.abort());
+  return {
+    signal: controller.signal,
+    dispose: () => disposable.dispose()
+  };
 }

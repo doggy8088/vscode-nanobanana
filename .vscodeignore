@@ -8,3 +8,5 @@ tests/**
 esbuild.js
 tsconfig.json
 vitest.config.ts
+docs/**
+scripts/**

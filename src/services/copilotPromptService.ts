@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { CoverPromptRequest } from '../types';
-import { UserFacingError } from '../errors';
+import { OperationCancelledError, UserFacingError } from '../errors';
 import { selectPreferredModel } from './modelSelection';
 
 const COVER_PROMPT_SYSTEM_INSTRUCTION = [
@@ -19,7 +19,8 @@ const DEFAULT_TRANSLATOR: Translator = (key, vars) => {
   const defaults: Record<string, string> = {
     'error.copilotNoPrompt': 'Copilot returned an empty prompt. Please try again.',
     'error.copilotNoModels':
-      'No Copilot models are available. Make sure GitHub Copilot is installed and signed in.'
+      'No Copilot models are available. Make sure GitHub Copilot is installed and signed in.',
+    'error.operationCancelled': 'Operation cancelled.'
   };
 
   const template = defaults[key] ?? key;
@@ -37,8 +38,18 @@ export class CopilotPromptService {
   async generateCoverPrompt(
     request: CoverPromptRequest,
     preferredModel: string,
-    t: Translator = DEFAULT_TRANSLATOR
+    t: Translator = DEFAULT_TRANSLATOR,
+    cancellationToken?: vscode.CancellationToken
   ): Promise<{ prompt: string; modelId: string }> {
+    const fallbackSource = cancellationToken ? undefined : new vscode.CancellationTokenSource();
+    const token = cancellationToken ?? fallbackSource?.token;
+    if (!token) {
+      throw new Error('Unable to initialize cancellation token.');
+    }
+    if (token.isCancellationRequested) {
+      throw new OperationCancelledError(t('error.operationCancelled'));
+    }
+
     const models = await vscode.lm.selectChatModels({ vendor: 'copilot' });
     const model = selectPreferredModel(models, preferredModel, t('error.copilotNoModels'));
 
@@ -58,14 +69,22 @@ export class CopilotPromptService {
     ];
 
     let content = '';
-    const cancellationSource = new vscode.CancellationTokenSource();
     try {
-      const response = await model.sendRequest(messages, {}, cancellationSource.token);
+      const response = await model.sendRequest(messages, {}, token);
       for await (const fragment of response.text) {
+        if (token.isCancellationRequested) {
+          throw new OperationCancelledError(t('error.operationCancelled'));
+        }
         content += fragment;
       }
+    } catch (error) {
+      if (token.isCancellationRequested) {
+        throw new OperationCancelledError(t('error.operationCancelled'));
+      }
+
+      throw error;
     } finally {
-      cancellationSource.dispose();
+      fallbackSource?.dispose();
     }
 
     const prompt = content.trim();
