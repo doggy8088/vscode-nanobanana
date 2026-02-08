@@ -836,16 +836,17 @@ function openImageEditorPanel(params: {
           ellipse: params.i18n.t('panel.imageEditor.tool.ellipse'),
           text: params.i18n.t('panel.imageEditor.tool.text'),
           undo: params.i18n.t('panel.imageEditor.action.undo'),
+          redo: params.i18n.t('panel.imageEditor.action.redo'),
           clear: params.i18n.t('panel.imageEditor.action.clear'),
           generate: params.i18n.t('panel.imageEditor.action.generate'),
           promptLabel: params.i18n.t('panel.imageEditor.promptLabel'),
           promptPlaceholder: params.i18n.t('panel.imageEditor.promptPlaceholder'),
-          annotationTextLabel: params.i18n.t('panel.imageEditor.annotationTextLabel'),
-          annotationTextPlaceholder: params.i18n.t('panel.imageEditor.annotationTextPlaceholder'),
+          annotationTextPrompt: params.i18n.t('panel.imageEditor.annotationTextPrompt'),
           imageSizeLabel: params.i18n.t('panel.imageEditor.imageSizeLabel'),
           statusReady: params.i18n.t('panel.imageEditor.status.ready'),
           statusProcessing: params.i18n.t('panel.imageEditor.status.processing'),
-          promptRequired: params.i18n.t('error.editorPromptEmpty')
+          promptRequired: params.i18n.t('error.editorPromptEmpty'),
+          annotationTextRequired: params.i18n.t('error.editorAnnotationTextEmpty')
         }
       });
       return;
@@ -1023,15 +1024,14 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
       color: var(--vscode-foreground);
       background: var(--vscode-editor-background);
       display: grid;
-      grid-template-rows: 1fr auto;
-      gap: 12px;
       height: 100vh;
       box-sizing: border-box;
     }
     .layout {
+      height: 100%;
       min-height: 0;
       display: grid;
-      grid-template-columns: 1fr 240px;
+      grid-template-columns: 1fr 300px;
       gap: 12px;
     }
     .canvas-panel {
@@ -1069,6 +1069,35 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
       touch-action: none;
       cursor: crosshair;
     }
+    .text-entry {
+      position: absolute;
+      z-index: 3;
+      display: grid;
+      gap: 6px;
+      min-width: 180px;
+      max-width: 240px;
+      padding: 8px;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      background: var(--vscode-editorWidget-background);
+      box-shadow: 0 8px 20px #0007;
+    }
+    .text-entry[hidden] {
+      display: none;
+    }
+    .text-entry input {
+      width: 100%;
+      box-sizing: border-box;
+      color: var(--vscode-input-foreground);
+      background: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 4px;
+      padding: 6px 8px;
+    }
+    .text-entry-hint {
+      font-size: 11px;
+      opacity: 0.8;
+    }
     .side-panel {
       border: 1px solid var(--vscode-panel-border);
       border-radius: 6px;
@@ -1093,22 +1122,16 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
       border-radius: 4px;
       padding: 6px 8px;
     }
-    .bottom {
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 6px;
-      padding: 10px;
-      display: grid;
-      gap: 8px;
-      background: var(--vscode-editorWidget-background);
-    }
     #promptInput {
-      min-height: 82px;
+      min-height: 120px;
       resize: vertical;
     }
     .actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      display: grid;
+      gap: 8px;
+    }
+    .actions button {
+      justify-self: start;
     }
     #status {
       font-size: 12px;
@@ -1128,10 +1151,15 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
         <button id="toolEllipse" type="button">Circle</button>
         <button id="toolText" type="button">Text</button>
         <button id="btnUndo" type="button">Undo</button>
+        <button id="btnRedo" type="button">Redo</button>
         <button id="btnClear" type="button">Clear</button>
       </div>
       <div class="canvas-host" id="canvasHost">
         <canvas id="imageCanvas"></canvas>
+        <div class="text-entry" id="textEntry" hidden>
+          <input id="textEntryInput" type="text" />
+          <div class="text-entry-hint">Enter=OK, Esc=Cancel</div>
+        </div>
       </div>
     </div>
     <aside class="side-panel">
@@ -1144,20 +1172,14 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
         </select>
       </div>
       <div class="field">
-        <label id="labelAnnotationText">Annotation Text</label>
-        <input id="annotationTextInput" type="text" placeholder="Type text and click image to place." />
+        <label id="labelPrompt">Prompt</label>
+        <textarea id="promptInput" placeholder="Describe how to edit this image."></textarea>
+      </div>
+      <div class="actions">
+        <button id="btnGenerate" type="button">Start Editing</button>
+        <div id="status"></div>
       </div>
     </aside>
-  </div>
-  <div class="bottom">
-    <div class="field">
-      <label id="labelPrompt">Prompt</label>
-      <textarea id="promptInput" placeholder="Describe how to edit this image."></textarea>
-    </div>
-    <div class="actions">
-      <button id="btnGenerate" type="button">Start Editing</button>
-      <div id="status"></div>
-    </div>
   </div>
   <script nonce="${nonce}">
     (() => {
@@ -1165,24 +1187,26 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
       const canvas = document.getElementById('imageCanvas');
       const canvasHost = document.getElementById('canvasHost');
       const ctx = canvas.getContext('2d');
+      const textEntry = document.getElementById('textEntry');
+      const textEntryInput = document.getElementById('textEntryInput');
       const promptInput = document.getElementById('promptInput');
-      const annotationTextInput = document.getElementById('annotationTextInput');
       const imageSizeSelect = document.getElementById('imageSizeSelect');
       const statusEl = document.getElementById('status');
       const btnGenerate = document.getElementById('btnGenerate');
       const btnUndo = document.getElementById('btnUndo');
+      const btnRedo = document.getElementById('btnRedo');
       const btnClear = document.getElementById('btnClear');
       const toolRect = document.getElementById('toolRect');
       const toolEllipse = document.getElementById('toolEllipse');
       const toolText = document.getElementById('toolText');
       const labelPrompt = document.getElementById('labelPrompt');
-      const labelAnnotationText = document.getElementById('labelAnnotationText');
       const labelImageSize = document.getElementById('labelImageSize');
 
       let image = null;
       let imageLoaded = false;
       let tool = 'rect';
       let drawing = null;
+      let textEntryPoint = null;
       let busy = false;
       let displayRect = { x: 0, y: 0, w: 1, h: 1 };
       let labels = {
@@ -1190,18 +1214,20 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
         ellipse: 'Circle',
         text: 'Text',
         undo: 'Undo',
+        redo: 'Redo',
         clear: 'Clear',
         generate: 'Start Editing',
-        promptLabel: 'Prompt',
+        promptLabel: 'Edit Suggestions',
         promptPlaceholder: 'Describe how to edit this image.',
-        annotationTextLabel: 'Annotation Text',
-        annotationTextPlaceholder: 'Type text and click image to place.',
+        annotationTextPrompt: 'Enter annotation text.',
         imageSizeLabel: 'Image Size',
         statusReady: 'Ready',
         statusProcessing: 'Processing...',
-        promptRequired: 'Prompt is required.'
+        promptRequired: 'Prompt is required.',
+        annotationTextRequired: 'Annotation text is required.'
       };
       const annotations = [];
+      const redoAnnotations = [];
 
       function setBusy(nextBusy) {
         busy = nextBusy;
@@ -1219,13 +1245,13 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
         toolEllipse.textContent = labels.ellipse;
         toolText.textContent = labels.text;
         btnUndo.textContent = labels.undo;
+        btnRedo.textContent = labels.redo;
         btnClear.textContent = labels.clear;
         btnGenerate.textContent = labels.generate;
         labelPrompt.textContent = labels.promptLabel;
-        labelAnnotationText.textContent = labels.annotationTextLabel;
         labelImageSize.textContent = labels.imageSizeLabel;
         promptInput.placeholder = labels.promptPlaceholder;
-        annotationTextInput.placeholder = labels.annotationTextPlaceholder;
+        textEntryInput.placeholder = labels.annotationTextPrompt;
       }
 
       function setTool(nextTool) {
@@ -1244,6 +1270,9 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
         }
         canvas.width = width;
         canvas.height = height;
+        if (textEntryPoint) {
+          closeTextEntry();
+        }
         draw();
       }
 
@@ -1351,9 +1380,100 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
             color: '#ff4d4f',
             strokeWidth: 2
           });
+          redoAnnotations.length = 0;
         }
         drawing = null;
         draw();
+      }
+
+      function undoAnnotation() {
+        if (annotations.length === 0) {
+          return;
+        }
+        const annotation = annotations.pop();
+        if (annotation) {
+          redoAnnotations.push(annotation);
+        }
+        draw();
+      }
+
+      function redoAnnotation() {
+        if (redoAnnotations.length === 0) {
+          return;
+        }
+        const annotation = redoAnnotations.pop();
+        if (annotation) {
+          annotations.push(annotation);
+        }
+        draw();
+      }
+
+      function closeTextEntry() {
+        textEntryPoint = null;
+        textEntryInput.value = '';
+        textEntry.hidden = true;
+      }
+
+      function commitTextEntry() {
+        if (!textEntryPoint) {
+          return;
+        }
+        const text = textEntryInput.value.trim();
+        if (!text) {
+          setStatus(labels.annotationTextRequired, true);
+          return;
+        }
+        annotations.push({
+          type: 'text',
+          x: textEntryPoint.x,
+          y: textEntryPoint.y,
+          w: 0,
+          h: 0,
+          text,
+          color: '#ff4d4f',
+          strokeWidth: 2
+        });
+        redoAnnotations.length = 0;
+        closeTextEntry();
+        draw();
+      }
+
+      function openTextEntry(point) {
+        textEntryPoint = point;
+        textEntry.hidden = false;
+        textEntryInput.value = '';
+
+        const left = displayRect.x + point.x * displayRect.w;
+        const top = displayRect.y + point.y * displayRect.h;
+        const hostWidth = canvasHost.clientWidth;
+        const hostHeight = canvasHost.clientHeight;
+        const popupWidth = 220;
+        const popupHeight = 72;
+        const x = Math.min(Math.max(8, left), Math.max(8, hostWidth - popupWidth - 8));
+        const y = Math.min(Math.max(8, top), Math.max(8, hostHeight - popupHeight - 8));
+        textEntry.style.left = Math.round(x) + 'px';
+        textEntry.style.top = Math.round(y) + 'px';
+        textEntryInput.focus();
+        textEntryInput.select();
+      }
+
+      function submitGenerate() {
+        if (busy) {
+          return;
+        }
+        const prompt = promptInput.value.trim();
+        if (!prompt) {
+          setStatus(labels.promptRequired, true);
+          return;
+        }
+        const hasAnnotations = annotations.length > 0;
+        vscode.postMessage({
+          type: 'apply',
+          prompt,
+          imageSize: imageSizeSelect.value,
+          hasAnnotations,
+          overlayDataUrl: hasAnnotations ? exportOverlayDataUrl() : ''
+        });
       }
 
       function exportOverlayDataUrl() {
@@ -1385,38 +1505,60 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
           next.src = dataUrl;
         });
         annotations.length = 0;
+        redoAnnotations.length = 0;
         drawing = null;
+        closeTextEntry();
         draw();
       }
 
       toolRect.addEventListener('click', () => setTool('rect'));
       toolEllipse.addEventListener('click', () => setTool('ellipse'));
       toolText.addEventListener('click', () => setTool('text'));
-      btnUndo.addEventListener('click', () => {
-        annotations.pop();
-        draw();
-      });
+      btnUndo.addEventListener('click', undoAnnotation);
+      btnRedo.addEventListener('click', redoAnnotation);
       btnClear.addEventListener('click', () => {
         annotations.length = 0;
+        redoAnnotations.length = 0;
+        drawing = null;
+        closeTextEntry();
         draw();
       });
-      btnGenerate.addEventListener('click', () => {
-        if (busy) {
+      btnGenerate.addEventListener('click', submitGenerate);
+
+      window.addEventListener('keydown', (event) => {
+        if (event.defaultPrevented || event.isComposing) {
           return;
         }
-        const prompt = promptInput.value.trim();
-        if (!prompt) {
-          setStatus(labels.promptRequired, true);
+        const isPrimaryModifier = event.ctrlKey || event.metaKey;
+        if (!isPrimaryModifier) {
           return;
         }
-        const hasAnnotations = annotations.length > 0;
-        vscode.postMessage({
-          type: 'apply',
-          prompt,
-          imageSize: imageSizeSelect.value,
-          hasAnnotations,
-          overlayDataUrl: hasAnnotations ? exportOverlayDataUrl() : ''
-        });
+
+        const key = event.key.toLowerCase();
+        if (key === 'enter' && !event.shiftKey) {
+          event.preventDefault();
+          submitGenerate();
+          return;
+        }
+
+        const target = event.target;
+        const isTypingTarget =
+          target instanceof HTMLElement &&
+          (target.matches('input, textarea') || target.isContentEditable);
+        if (isTypingTarget) {
+          return;
+        }
+
+        if (key === 'z' && !event.shiftKey) {
+          event.preventDefault();
+          undoAnnotation();
+          return;
+        }
+
+        if ((key === 'y' && !event.shiftKey) || (key === 'z' && event.shiftKey)) {
+          event.preventDefault();
+          redoAnnotation();
+        }
       });
 
       canvas.addEventListener('pointerdown', (event) => {
@@ -1428,24 +1570,10 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
           return;
         }
         if (tool === 'text') {
-          const text = annotationTextInput.value.trim();
-          if (!text) {
-            setStatus(labels.annotationTextPlaceholder, true);
-            return;
-          }
-          annotations.push({
-            type: 'text',
-            x: point.x,
-            y: point.y,
-            w: 0,
-            h: 0,
-            text,
-            color: '#ff4d4f',
-            strokeWidth: 2
-          });
-          draw();
+          openTextEntry(point);
           return;
         }
+        closeTextEntry();
         drawing = { type: tool, start: point, current: point };
       });
 
@@ -1463,6 +1591,21 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
 
       canvas.addEventListener('pointerup', commitDrawing);
       canvas.addEventListener('pointerleave', commitDrawing);
+
+      textEntryInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          commitTextEntry();
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeTextEntry();
+        }
+      });
+      textEntry.addEventListener('pointerdown', (event) => {
+        event.stopPropagation();
+      });
 
       window.addEventListener('resize', resizeCanvas);
       resizeCanvas();
@@ -1488,6 +1631,9 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
         }
         if (message.type === 'state') {
           setBusy(Boolean(message.busy));
+          if (busy) {
+            closeTextEntry();
+          }
           if (message.message) {
             setStatus(message.message);
           }
