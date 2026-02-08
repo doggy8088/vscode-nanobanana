@@ -1,12 +1,22 @@
 import * as vscode from 'vscode';
 import { getExtensionConfig } from './config';
-import { COMMANDS, CONFIG_KEYS, DEFAULTS, WORKSPACE_STATE_KEYS } from './constants';
+import {
+  COMMANDS,
+  CONFIG_KEYS,
+  DEFAULTS,
+  MODEL_ID_OPTIONS,
+  WORKSPACE_STATE_KEYS
+} from './constants';
 import { OperationCancelledError, UserFacingError } from './errors';
 import { createRuntimeI18n } from './i18n';
 import { ApiKeyStore } from './services/apiKeyStore';
 import { CopilotPromptService } from './services/copilotPromptService';
 import { GeminiImageService } from './services/geminiImageService';
 import { ImageFileService } from './services/imageFileService';
+import {
+  collectDistinctModelIdentifiers,
+  getModelIdentifier
+} from './services/modelSelection';
 import {
   ASPECT_RATIO_OPTIONS,
   AspectRatioOption,
@@ -56,11 +66,71 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand(COMMANDS.selectCopilotPromptModel, async () => {
+      const config = readRuntimeConfig();
+      const i18n = createRuntimeI18n(config.displayLanguage, vscode.env.language);
+
+      await executeSafely(async () => {
+        const models = await vscode.lm.selectChatModels({ vendor: 'copilot' });
+        const modelIds = collectDistinctModelIdentifiers(models);
+        if (modelIds.length === 0) {
+          throw new UserFacingError(i18n.t('error.copilotNoModels'));
+        }
+
+        const currentModel = normalizeCopilotPromptModel(config.copilotPromptModel);
+        const items = [
+          {
+            label: i18n.t('quickpick.copilotModel.auto.label'),
+            description: i18n.t('quickpick.copilotModel.auto.description'),
+            modelId: 'auto',
+            picked: !currentModel
+          },
+          ...modelIds.map((modelId) => {
+            const model = models.find((item) => getModelIdentifier(item) === modelId);
+            return {
+              label: modelId,
+              description: model?.name && model.name !== modelId ? model.name : '',
+              detail: [model?.family, model?.version].filter(Boolean).join(' | '),
+              modelId,
+              picked: modelId.toLowerCase() === currentModel.toLowerCase()
+            };
+          })
+        ];
+
+        const picked = await vscode.window.showQuickPick(items, {
+          title: i18n.t('quickpick.copilotModel.title'),
+          placeHolder: i18n.t('quickpick.copilotModel.placeholder'),
+          ignoreFocusOut: true
+        });
+
+        if (!picked) {
+          return;
+        }
+
+        await getExtensionConfig().update(
+          CONFIG_KEYS.copilotPromptModel,
+          picked.modelId,
+          vscode.ConfigurationTarget.Global
+        );
+
+        vscode.window.showInformationMessage(
+          i18n.t('info.copilotPromptModelSaved', { modelId: picked.modelId })
+        );
+      }, output);
+    })
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand(COMMANDS.generateFromSelection, async () => {
       const config = readRuntimeConfig();
       const i18n = createRuntimeI18n(config.displayLanguage, vscode.env.language);
 
       await executeSafely(async () => {
+        const hasApiKey = await ensureGeminiApiKeyConfigured(apiKeyStore, i18n.t);
+        if (!hasApiKey) {
+          return;
+        }
+
         const style = await pickStylePreset(
           context,
           config.defaultStyle,
@@ -115,6 +185,15 @@ export function activate(context: vscode.ExtensionContext): void {
                 token
               );
 
+              logImageGenerationDebug(output, i18n.t, {
+                mode: 'selection',
+                styleLabel,
+                aspectRatio,
+                imageSize: config.imageSize,
+                modelId: config.modelId,
+                prompt: promptResult.prompt
+              });
+
               output.appendLine(i18n.t('log.copilotModelSelected', { modelId: promptResult.modelId }));
               throwIfCancelled(token, i18n.t);
 
@@ -148,6 +227,11 @@ export function activate(context: vscode.ExtensionContext): void {
       const i18n = createRuntimeI18n(config.displayLanguage, vscode.env.language);
 
       await executeSafely(async () => {
+        const hasApiKey = await ensureGeminiApiKeyConfigured(apiKeyStore, i18n.t);
+        if (!hasApiKey) {
+          return;
+        }
+
         const style = await pickStylePreset(
           context,
           config.defaultStyle,
@@ -173,8 +257,23 @@ export function activate(context: vscode.ExtensionContext): void {
           return;
         }
 
+        const selectionContext = getActiveEditorSelectionText();
+        const promptWithSelection = mergeFreeformPromptWithSelection(rawPrompt, selectionContext);
         const styleLabel = i18n.t(`style.${style.id}.label`);
-        const enhancedPrompt = buildStyleEnhancedPrompt(rawPrompt, style, styleLabel, aspectRatio);
+        const enhancedPrompt = buildStyleEnhancedPrompt(
+          promptWithSelection,
+          style,
+          styleLabel,
+          aspectRatio
+        );
+        logImageGenerationDebug(output, i18n.t, {
+          mode: 'freeform',
+          styleLabel,
+          aspectRatio,
+          imageSize: config.imageSize,
+          modelId: config.modelId,
+          prompt: enhancedPrompt
+        });
 
         await vscode.window.withProgress(
           {
@@ -310,12 +409,16 @@ async function pickAspectRatio(
 function readRuntimeConfig() {
   const config = getExtensionConfig();
   const modelId = config.get<string>(CONFIG_KEYS.modelId, DEFAULTS.modelId) ?? DEFAULTS.modelId;
+  const normalizedModelId = MODEL_ID_OPTIONS.includes(modelId as (typeof MODEL_ID_OPTIONS)[number])
+    ? modelId
+    : DEFAULTS.modelId;
   const geminiApiBaseUrl =
     config.get<string>(CONFIG_KEYS.geminiApiBaseUrl, DEFAULTS.geminiApiBaseUrl) ??
     DEFAULTS.geminiApiBaseUrl;
   const copilotPromptModel =
     config.get<string>(CONFIG_KEYS.copilotPromptModel, DEFAULTS.copilotPromptModel) ??
     DEFAULTS.copilotPromptModel;
+  const normalizedCopilotPromptModel = normalizeCopilotPromptModel(copilotPromptModel);
   const imageOutputFormat =
     config.get<string>(CONFIG_KEYS.imageOutputFormat, DEFAULTS.imageOutputFormat) ??
     DEFAULTS.imageOutputFormat;
@@ -335,9 +438,9 @@ function readRuntimeConfig() {
     config.get<string>(CONFIG_KEYS.displayLanguage, DEFAULTS.displayLanguage) ?? DEFAULTS.displayLanguage;
 
   return {
-    modelId,
+    modelId: normalizedModelId,
     geminiApiBaseUrl,
-    copilotPromptModel,
+    copilotPromptModel: normalizedCopilotPromptModel,
     imageOutputFormat,
     imageSize,
     defaultStyle,
@@ -346,6 +449,26 @@ function readRuntimeConfig() {
     rememberLastAspectRatio,
     displayLanguage
   };
+}
+
+async function ensureGeminiApiKeyConfigured(
+  apiKeyStore: ApiKeyStore,
+  t: (key: string, vars?: Record<string, string | number>) => string
+): Promise<boolean> {
+  const current = await apiKeyStore.getGeminiApiKey();
+  if (current?.trim()) {
+    return true;
+  }
+
+  vscode.window.showInformationMessage(t('info.openApiKeySetup'));
+  await vscode.commands.executeCommand(COMMANDS.setGeminiApiKey);
+
+  const updated = await apiKeyStore.getGeminiApiKey();
+  return Boolean(updated?.trim());
+}
+
+function normalizeCopilotPromptModel(value: string): string {
+  return value.trim().toLowerCase() === 'auto' ? '' : value;
 }
 
 async function executeSafely(handler: () => Promise<void>, output: vscode.OutputChannel): Promise<void> {
@@ -380,4 +503,52 @@ function createAbortBridge(token: vscode.CancellationToken): { signal: AbortSign
     signal: controller.signal,
     dispose: () => disposable.dispose()
   };
+}
+
+function getActiveEditorSelectionText(): string | undefined {
+  const editor = vscode.window.activeTextEditor;
+  const selected = editor?.document.getText(editor.selection)?.trim();
+  return selected || undefined;
+}
+
+function mergeFreeformPromptWithSelection(rawPrompt: string, selectionText: string | undefined): string {
+  if (!selectionText) {
+    return rawPrompt;
+  }
+
+  const maxSelectionLength = 4_000;
+  const truncatedSelection =
+    selectionText.length > maxSelectionLength
+      ? `${selectionText.slice(0, maxSelectionLength)}\n...[selection truncated]`
+      : selectionText;
+
+  return `${rawPrompt}\n\nEditor selection context:\n${truncatedSelection}`;
+}
+
+function logImageGenerationDebug(
+  output: vscode.OutputChannel,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  params: {
+    mode: 'selection' | 'freeform';
+    styleLabel: string;
+    aspectRatio: string;
+    imageSize: string;
+    modelId: string;
+    prompt: string;
+  }
+): void {
+  output.appendLine(t('log.debugSeparator'));
+  output.appendLine(t('log.debugMode', { mode: params.mode }));
+  output.appendLine(
+    t('log.debugParams', {
+      style: params.styleLabel,
+      aspectRatio: params.aspectRatio,
+      imageSize: params.imageSize,
+      modelId: params.modelId
+    })
+  );
+  output.appendLine(t('log.debugPromptStart'));
+  output.appendLine(params.prompt);
+  output.appendLine(t('log.debugPromptEnd'));
+  output.appendLine(t('log.debugSeparator'));
 }

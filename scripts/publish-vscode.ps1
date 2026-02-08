@@ -14,6 +14,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$BaseImagesUrl = 'https://vscode-nanobanana.gh.miniasp.com/'
 
 function Invoke-Step {
   param(
@@ -75,7 +76,9 @@ if (-not $SkipChecks) {
 }
 
 if ($PackageOnly) {
-  Invoke-Step -Name 'Create VSIX package' -Action { Invoke-Vsce -Args @('package') }
+  Invoke-Step -Name 'Create VSIX package' -Action {
+    Invoke-Vsce -Args @('package', '--baseImagesUrl', $BaseImagesUrl)
+  }
   Write-Host 'Done. VSIX package generated.'
   exit 0
 }
@@ -91,7 +94,7 @@ if ($Version) {
 
 if ($DryRun) {
   $displayPat = if ([string]::IsNullOrWhiteSpace($patForCommand)) { '<VSCE_PAT>' } else { '<REDACTED>' }
-  Write-Host "Dry run only. Command: npx @vscode/vsce $($publishArgs -join ' ') --pat $displayPat"
+  Write-Host "Dry run only. Command: npx @vscode/vsce $($publishArgs -join ' ') --baseImagesUrl $BaseImagesUrl --pat $displayPat"
   exit 0
 }
 
@@ -99,7 +102,7 @@ if ([string]::IsNullOrWhiteSpace($patForCommand)) {
   throw 'VSCE_PAT is not set. Export VSCE_PAT before publishing.'
 }
 
-$publishArgs += @('--pat', $patForCommand)
+$publishArgs += @('--baseImagesUrl', $BaseImagesUrl, '--pat', $patForCommand)
 
 Invoke-Step -Name 'Publish to Visual Studio Marketplace' -Action {
   Invoke-Vsce -Args $publishArgs

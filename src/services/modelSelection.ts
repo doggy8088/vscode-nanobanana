@@ -10,13 +10,37 @@ function normalize(value: string | undefined): string {
   return (value ?? '').trim().toLowerCase();
 }
 
+export function getModelIdentifier(model: ModelDescriptor): string {
+  const id = (model.id ?? '').trim();
+  if (id) {
+    return id;
+  }
+
+  const name = (model.name ?? '').trim();
+  return name;
+}
+
+export function collectDistinctModelIdentifiers<T extends ModelDescriptor>(
+  models: readonly T[]
+): string[] {
+  const distinct = new Set<string>();
+  for (const model of models) {
+    const identifier = getModelIdentifier(model);
+    if (identifier) {
+      distinct.add(identifier);
+    }
+  }
+
+  return [...distinct].sort((a, b) => a.localeCompare(b));
+}
+
 function includesAnyField(model: ModelDescriptor, needle: string): boolean {
   const candidates = [model.id, model.family, model.version, model.name];
   return candidates.some((candidate) => normalize(candidate).includes(needle));
 }
 
 export function selectPreferredModel<T extends ModelDescriptor>(
-  models: T[],
+  models: readonly T[],
   preferred: string,
   noModelsMessage?: string
 ): T {

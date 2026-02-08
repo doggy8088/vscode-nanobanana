@@ -1,5 +1,36 @@
 import { describe, expect, it } from 'vitest';
-import { selectPreferredModel } from '../src/services/modelSelection';
+import {
+  collectDistinctModelIdentifiers,
+  getModelIdentifier,
+  selectPreferredModel
+} from '../src/services/modelSelection';
+
+describe('collectDistinctModelIdentifiers', () => {
+  it('returns sorted unique model ids from runtime models', () => {
+    const models = [
+      { id: 'gpt-4.1' },
+      { id: 'gemini-3-pro-preview' },
+      { id: 'gpt-4.1' },
+      { name: 'claude-sonnet-4.5' },
+      { id: '' }
+    ];
+
+    expect(collectDistinctModelIdentifiers(models)).toEqual([
+      'claude-sonnet-4.5',
+      'gemini-3-pro-preview',
+      'gpt-4.1'
+    ]);
+  });
+});
+
+describe('getModelIdentifier', () => {
+  it('prefers id and falls back to name', () => {
+    expect(getModelIdentifier({ id: 'gpt-5', name: 'GPT-5' })).toBe('gpt-5');
+    expect(getModelIdentifier({ id: '   ', name: 'gemini-3-pro-preview' })).toBe(
+      'gemini-3-pro-preview'
+    );
+  });
+});
 
 describe('selectPreferredModel', () => {
   it('returns exact id match when available', () => {

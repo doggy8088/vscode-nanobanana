@@ -28,7 +28,8 @@
   "activationEvents": [
     "onCommand:nanoBanana.generateFromSelection",
     "onCommand:nanoBanana.generateFreeform",
-    "onCommand:nanoBanana.setGeminiApiKey"
+    "onCommand:nanoBanana.setGeminiApiKey",
+    "onCommand:nanoBanana.selectCopilotPromptModel"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -44,6 +45,10 @@
       {
         "command": "nanoBanana.setGeminiApiKey",
         "title": "%command.setGeminiApiKey.title%"
+      },
+      {
+        "command": "nanoBanana.selectCopilotPromptModel",
+        "title": "%command.selectCopilotPromptModel.title%"
       }
     ],
     "menus": {
@@ -61,7 +66,11 @@
       "properties": {
         "nanoBanana.modelId": {
           "type": "string",
-          "default": "gpt-3-pro-image-preview",
+          "enum": [
+            "gemini-3-pro-image-preview",
+            "gemini-2.5-flash-image"
+          ],
+          "default": "gemini-3-pro-image-preview",
           "description": "%config.modelId.description%"
         },
         "nanoBanana.geminiApiBaseUrl": {
@@ -71,7 +80,7 @@
         },
         "nanoBanana.copilotPromptModel": {
           "type": "string",
-          "default": "gpt-4.1",
+          "default": "auto",
           "description": "%config.copilotPromptModel.description%"
         },
         "nanoBanana.imageOutputFormat": {
@@ -94,6 +103,20 @@
         },
         "nanoBanana.defaultStyle": {
           "type": "string",
+          "enum": [
+            "infographic",
+            "article-cover",
+            "ad-dm",
+            "social-post",
+            "product-showcase",
+            "ecommerce-banner",
+            "business-presentation",
+            "minimal-flat-illustration",
+            "3d-render",
+            "photorealistic",
+            "watercolor",
+            "tech-neon"
+          ],
           "default": "article-cover",
           "description": "%config.defaultStyle.description%"
         },
@@ -136,16 +159,6 @@
             "th",
             "vi"
           ],
-          "enumDescriptions": [
-            "%config.displayLanguage.auto%",
-            "%config.displayLanguage.en%",
-            "%config.displayLanguage.zhTW%",
-            "%config.displayLanguage.zhCN%",
-            "%config.displayLanguage.ja%",
-            "%config.displayLanguage.ko%",
-            "%config.displayLanguage.th%",
-            "%config.displayLanguage.vi%"
-          ],
           "default": "auto",
           "description": "%config.displayLanguage.description%"
         }
@@ -158,7 +171,7 @@
     "watch": "node esbuild.js --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "package:vsix": "npx @vscode/vsce package",
+    "package:vsix": "npx @vscode/vsce package --baseImagesUrl https://vscode-nanobanana.gh.miniasp.com/",
     "publish:vscode": "pwsh -File scripts/publish-vscode.ps1"
   },
   "devDependencies": {

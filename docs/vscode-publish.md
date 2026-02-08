@@ -43,6 +43,7 @@ $env:VSCE_PAT = "<your-marketplace-pat>"
 此腳本會做以下事情：
 - （預設）`npm ci`、`typecheck`、`test`、`build`
 - 呼叫 `@vscode/vsce` 進行打包/上架
+- 自動加入 `--baseImagesUrl https://vscode-nanobanana.gh.miniasp.com/`，讓 `README.md` 的相對圖片連結在 Marketplace 顯示為絕對網址
 
 ### 常用指令
 

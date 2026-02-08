@@ -3,7 +3,8 @@ export const EXTENSION_CONFIG_NAMESPACE = 'nanoBanana';
 export const COMMANDS = {
   generateFromSelection: 'nanoBanana.generateFromSelection',
   generateFreeform: 'nanoBanana.generateFreeform',
-  setGeminiApiKey: 'nanoBanana.setGeminiApiKey'
+  setGeminiApiKey: 'nanoBanana.setGeminiApiKey',
+  selectCopilotPromptModel: 'nanoBanana.selectCopilotPromptModel'
 } as const;
 
 export const CONFIG_KEYS = {
@@ -12,6 +13,7 @@ export const CONFIG_KEYS = {
   copilotPromptModel: 'copilotPromptModel',
   imageOutputFormat: 'imageOutputFormat',
   imageSize: 'imageSize',
+  stylePromptOverrides: 'stylePromptOverrides',
   defaultStyle: 'defaultStyle',
   rememberLastStyle: 'rememberLastStyle',
   defaultAspectRatio: 'defaultAspectRatio',
@@ -19,12 +21,15 @@ export const CONFIG_KEYS = {
   displayLanguage: 'displayLanguage'
 } as const;
 
+export const MODEL_ID_OPTIONS = ['gemini-3-pro-image-preview', 'gemini-2.5-flash-image'] as const;
+
 export const DEFAULTS = {
-  modelId: 'gpt-3-pro-image-preview',
+  modelId: 'gemini-3-pro-image-preview',
   geminiApiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-  copilotPromptModel: 'gpt-4.1',
+  copilotPromptModel: 'auto',
   imageOutputFormat: 'png',
   imageSize: '1K',
+  stylePromptOverrides: {},
   defaultStyle: 'article-cover',
   rememberLastStyle: true,
   defaultAspectRatio: '1:1',
