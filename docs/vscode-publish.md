@@ -115,3 +115,29 @@ npm run build
 
 ### Q3: `icon.png not found`
 - 專案根目錄缺少 `icon.png`，補上後再打包。
+
+## 8. GitHub Actions 自動驗證與發佈
+
+本專案提供 `.github/workflows/ci.yml`，流程如下：
+
+1. `pull_request` / `push` 到 `main`：自動執行 `npm ci`、`typecheck`、`test`、`build`
+2. `push` 到 `main` 時，若偵測到 `package.json` 的 `version` 有變更：自動打包、上架 Marketplace、建立 GitHub Release
+
+### 必要 Secrets
+
+請在 GitHub Repository Settings -> Secrets and variables -> Actions 新增：
+
+- `VSCE_PAT`: Visual Studio Marketplace PAT（用於 `vsce publish`）
+
+### 發布操作
+
+1. 修改 `package.json` 的 `version`（例如 `0.1.1`）
+2. 直接將變更 commit 並 push 到 `main`
+
+```bash
+git add package.json
+git commit -m "chore: bump version to 0.1.1"
+git push origin main
+```
+
+> Workflow 會自動建立 `v0.1.1` 這類 tag 對應的 GitHub Release（不需手動建立 tag）。
