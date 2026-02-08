@@ -9,6 +9,7 @@
   "config.geminiApiBaseUrl.description": "Gemini API のベース URL。",
   "config.copilotPromptModel.description": "プロンプト生成で優先する Copilot モデル ID/family。",
   "config.imageOutputFormat.description": "保存する画像の出力形式。",
+  "config.imageSize.description": "生成画像サイズ（Gemini imageConfig.imageSize に適用）。",
   "config.defaultStyle.description": "既定のスタイル preset ID。",
   "config.rememberLastStyle.description": "ワークスペースで前回選択したスタイルを記憶する。",
   "config.defaultAspectRatio.description": "画像生成の既定アスペクト比。",

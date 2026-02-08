@@ -9,6 +9,7 @@
   "config.geminiApiBaseUrl.description": "Base URL của Gemini API.",
   "config.copilotPromptModel.description": "Model ID/family Copilot ưu tiên khi tạo prompt.",
   "config.imageOutputFormat.description": "Định dạng ảnh đầu ra khi lưu.",
+  "config.imageSize.description": "Kích thước ảnh khi tạo (áp dụng cho Gemini imageConfig.imageSize).",
   "config.defaultStyle.description": "ID preset phong cách mặc định.",
   "config.rememberLastStyle.description": "Ghi nhớ phong cách đã chọn gần nhất trong workspace.",
   "config.defaultAspectRatio.description": "Tỉ lệ ảnh mặc định cho tạo ảnh.",

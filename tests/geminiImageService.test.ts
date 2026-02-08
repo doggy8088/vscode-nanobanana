@@ -158,6 +158,51 @@ describe('GeminiImageService', () => {
     expect(requestBody.generationConfig.imageConfig.aspectRatio).toBe('16:9');
   });
 
+  it('uses configured imageSize when provided', async () => {
+    const body = {
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                inlineData: {
+                  mimeType: 'image/png',
+                  data: Buffer.from('size').toString('base64')
+                }
+              }
+            ]
+          }
+        }
+      ]
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+
+    const service = new GeminiImageService(
+      {
+        getGeminiApiKey: async () => 'secret'
+      },
+      undefined,
+      fetchMock as unknown as typeof fetch
+    );
+
+    await service.generateImage({
+      prompt: 'cover image',
+      modelId: 'gpt-3-pro-image-preview',
+      baseUrl: 'https://example.com/',
+      imageSize: '2K'
+    });
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const requestBody = JSON.parse(String(init.body));
+    expect(requestBody.generationConfig.imageConfig.imageSize).toBe('2K');
+  });
+
   it('honors external cancellation signal before request starts', async () => {
     const fetchMock = vi.fn();
     const service = new GeminiImageService(

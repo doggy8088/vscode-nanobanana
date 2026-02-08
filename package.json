@@ -82,6 +82,16 @@
           "default": "png",
           "description": "%config.imageOutputFormat.description%"
         },
+        "nanoBanana.imageSize": {
+          "type": "string",
+          "enum": [
+            "1K",
+            "2K",
+            "4K"
+          ],
+          "default": "1K",
+          "description": "%config.imageSize.description%"
+        },
         "nanoBanana.defaultStyle": {
           "type": "string",
           "default": "article-cover",

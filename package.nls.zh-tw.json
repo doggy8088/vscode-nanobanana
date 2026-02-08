@@ -9,6 +9,7 @@
   "config.geminiApiBaseUrl.description": "Gemini API 基底網址。",
   "config.copilotPromptModel.description": "提示詞生成時優先使用的 Copilot 模型 ID/family。",
   "config.imageOutputFormat.description": "儲存圖片的輸出格式。",
+  "config.imageSize.description": "生圖尺寸（對應 Gemini imageConfig.imageSize）。",
   "config.defaultStyle.description": "預設風格 preset ID。",
   "config.rememberLastStyle.description": "記住工作區上次選擇的風格。",
   "config.defaultAspectRatio.description": "生圖預設比例。",

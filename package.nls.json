@@ -9,6 +9,7 @@
   "config.geminiApiBaseUrl.description": "Gemini API base URL.",
   "config.copilotPromptModel.description": "Preferred Copilot model id/family for prompt generation.",
   "config.imageOutputFormat.description": "Output image format for saved files.",
+  "config.imageSize.description": "Image size for generation (applies to Gemini imageConfig.imageSize).",
   "config.defaultStyle.description": "Default style preset id.",
   "config.rememberLastStyle.description": "Remember the last selected style in workspace.",
   "config.defaultAspectRatio.description": "Default aspect ratio for image generation.",

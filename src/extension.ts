@@ -123,6 +123,7 @@ export function activate(context: vscode.ExtensionContext): void {
                   prompt: promptResult.prompt,
                   modelId: config.modelId,
                   baseUrl: config.geminiApiBaseUrl,
+                  imageSize: config.imageSize,
                   aspectRatio
                 },
                 i18n.t,
@@ -190,6 +191,7 @@ export function activate(context: vscode.ExtensionContext): void {
                   prompt: enhancedPrompt,
                   modelId: config.modelId,
                   baseUrl: config.geminiApiBaseUrl,
+                  imageSize: config.imageSize,
                   aspectRatio
                 },
                 i18n.t,
@@ -317,6 +319,7 @@ function readRuntimeConfig() {
   const imageOutputFormat =
     config.get<string>(CONFIG_KEYS.imageOutputFormat, DEFAULTS.imageOutputFormat) ??
     DEFAULTS.imageOutputFormat;
+  const imageSize = config.get<string>(CONFIG_KEYS.imageSize, DEFAULTS.imageSize) ?? DEFAULTS.imageSize;
   const defaultStyle =
     config.get<string>(CONFIG_KEYS.defaultStyle, DEFAULTS.defaultStyle) ?? DEFAULTS.defaultStyle;
   const rememberLastStyle =
@@ -336,6 +339,7 @@ function readRuntimeConfig() {
     geminiApiBaseUrl,
     copilotPromptModel,
     imageOutputFormat,
+    imageSize,
     defaultStyle,
     rememberLastStyle,
     defaultAspectRatio,

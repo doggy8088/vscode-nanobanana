@@ -7,6 +7,7 @@ interface GeminiGenerateOptions {
   prompt: string;
   modelId: string;
   baseUrl: string;
+  imageSize?: string;
   aspectRatio?: string;
 }
 
@@ -15,7 +16,8 @@ interface LoggerLike {
 }
 
 type FetchLike = typeof fetch;
-const FIXED_IMAGE_SIZE = '1K';
+const DEFAULT_IMAGE_SIZE = '1K';
+const SUPPORTED_IMAGE_SIZES = ['1K', '2K', '4K'] as const;
 
 export type Translator = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -82,7 +84,7 @@ export class GeminiImageService {
       ],
       generationConfig: {
         responseModalities: ['IMAGE'],
-        ...buildImageConfig(options.aspectRatio)
+        ...buildImageConfig(options.imageSize, options.aspectRatio)
       }
     };
 
@@ -229,16 +231,28 @@ function normalizeModelId(modelId: string): string {
   return normalized;
 }
 
-function buildImageConfig(aspectRatio: string | undefined): {
-  imageConfig: { imageSize: typeof FIXED_IMAGE_SIZE; aspectRatio?: string };
+function buildImageConfig(imageSize: string | undefined, aspectRatio: string | undefined): {
+  imageConfig: { imageSize: string; aspectRatio?: string };
 } {
+  const size = normalizeImageSize(imageSize);
   const normalized = aspectRatio?.trim();
   const resolvedAspectRatio = normalized && isSupportedAspectRatio(normalized) ? normalized : undefined;
 
   return {
     imageConfig: {
-      imageSize: FIXED_IMAGE_SIZE,
+      imageSize: size,
       ...(resolvedAspectRatio ? { aspectRatio: resolvedAspectRatio } : {})
     }
   };
+}
+
+function normalizeImageSize(imageSize: string | undefined): string {
+  const normalized = imageSize?.trim().toUpperCase();
+  if (!normalized) {
+    return DEFAULT_IMAGE_SIZE;
+  }
+
+  return SUPPORTED_IMAGE_SIZES.includes(normalized as (typeof SUPPORTED_IMAGE_SIZES)[number])
+    ? normalized
+    : DEFAULT_IMAGE_SIZE;
 }

@@ -12,7 +12,7 @@ Publish guide: `docs/vscode-publish.md`
 - Secure Gemini API key storage (`SecretStorage`)
 - Style picker (12 built-in styles)
 - Aspect ratio picker
-- Fixed image size: `1K`
+- Configurable image size (`1K`, `2K`, `4K`)
 - Cancellable generation progress UI
 - Prompt generation with VS Code Copilot LM API (`vscode.lm`)
 - Runtime i18n for extension messages
@@ -46,6 +46,7 @@ Language behavior:
 - `nanoBanana.geminiApiBaseUrl` (default: `https://generativelanguage.googleapis.com/v1beta`)
 - `nanoBanana.copilotPromptModel` (default: `gpt-4.1`)
 - `nanoBanana.imageOutputFormat` (default: `png`)
+- `nanoBanana.imageSize` (default: `1K`, options: `1K`, `2K`, `4K`)
 - `nanoBanana.defaultStyle` (default: `article-cover`)
 - `nanoBanana.rememberLastStyle` (default: `true`)
 - `nanoBanana.defaultAspectRatio` (default: `1:1`)

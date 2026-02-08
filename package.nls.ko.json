@@ -9,6 +9,7 @@
   "config.geminiApiBaseUrl.description": "Gemini API 기본 URL입니다.",
   "config.copilotPromptModel.description": "프롬프트 생성 시 우선 사용할 Copilot 모델 ID/family입니다.",
   "config.imageOutputFormat.description": "저장할 이미지 출력 형식입니다.",
+  "config.imageSize.description": "생성 이미지 크기(Gemini imageConfig.imageSize에 적용).",
   "config.defaultStyle.description": "기본 스타일 preset ID입니다.",
   "config.rememberLastStyle.description": "작업 영역에서 마지막 선택 스타일을 기억합니다.",
   "config.defaultAspectRatio.description": "이미지 생성 기본 비율입니다.",

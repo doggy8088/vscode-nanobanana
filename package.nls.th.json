@@ -9,6 +9,7 @@
   "config.geminiApiBaseUrl.description": "Base URL ของ Gemini API",
   "config.copilotPromptModel.description": "Copilot model ID/family ที่ต้องการใช้เป็นลำดับแรกสำหรับสร้างพรอมป์ต์",
   "config.imageOutputFormat.description": "รูปแบบไฟล์ภาพที่บันทึก",
+  "config.imageSize.description": "ขนาดภาพที่ใช้สร้าง (ใช้กับ Gemini imageConfig.imageSize)",
   "config.defaultStyle.description": "รหัส preset สไตล์เริ่มต้น",
   "config.rememberLastStyle.description": "จดจำสไตล์ที่เลือกครั้งล่าสุดใน workspace",
   "config.defaultAspectRatio.description": "อัตราส่วนภาพเริ่มต้นสำหรับการสร้างภาพ",
