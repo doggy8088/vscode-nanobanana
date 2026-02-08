@@ -203,6 +203,54 @@ describe('GeminiImageService', () => {
     expect(requestBody.generationConfig.imageConfig.imageSize).toBe('2K');
   });
 
+  it('includes reference image parts for image editing', async () => {
+    const body = {
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                inlineData: {
+                  mimeType: 'image/png',
+                  data: Buffer.from('edited').toString('base64')
+                }
+              }
+            ]
+          }
+        }
+      ]
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+
+    const service = new GeminiImageService(
+      {
+        getGeminiApiKey: async () => 'secret'
+      },
+      undefined,
+      fetchMock as unknown as typeof fetch
+    );
+
+    const sourceImage = Buffer.from('source-bytes');
+    await service.generateImage({
+      prompt: 'change the background to orange',
+      modelId: 'gemini-3-pro-image-preview',
+      baseUrl: 'https://example.com/',
+      referenceImages: [{ bytes: sourceImage, mimeType: 'image/png' }]
+    });
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const requestBody = JSON.parse(String(init.body));
+    expect(requestBody.contents[0].parts[0].text).toBe('change the background to orange');
+    expect(requestBody.contents[0].parts[1].inlineData.mimeType).toBe('image/png');
+    expect(requestBody.contents[0].parts[1].inlineData.data).toBe(sourceImage.toString('base64'));
+  });
+
   it('honors external cancellation signal before request starts', async () => {
     const fetchMock = vi.fn();
     const service = new GeminiImageService(

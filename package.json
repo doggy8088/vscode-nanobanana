@@ -27,9 +27,9 @@
   },
   "activationEvents": [
     "onCommand:nanoBanana.generateFromSelection",
-    "onCommand:nanoBanana.generateFreeform",
     "onCommand:nanoBanana.setGeminiApiKey",
-    "onCommand:nanoBanana.selectCopilotPromptModel"
+    "onCommand:nanoBanana.selectCopilotPromptModel",
+    "onCommand:nanoBanana.editImageWithReference"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -39,16 +39,16 @@
         "title": "%command.generateFromSelection.title%"
       },
       {
-        "command": "nanoBanana.generateFreeform",
-        "title": "%command.generateFreeform.title%"
-      },
-      {
         "command": "nanoBanana.setGeminiApiKey",
         "title": "%command.setGeminiApiKey.title%"
       },
       {
         "command": "nanoBanana.selectCopilotPromptModel",
         "title": "%command.selectCopilotPromptModel.title%"
+      },
+      {
+        "command": "nanoBanana.editImageWithReference",
+        "title": "%command.editImageWithReference.title%"
       }
     ],
     "menus": {
@@ -57,6 +57,25 @@
           "command": "nanoBanana.generateFromSelection",
           "when": "editorTextFocus",
           "group": "navigation@100"
+        },
+        {
+          "command": "nanoBanana.editImageWithReference",
+          "when": "resourceScheme == file && (resourceExtname == .png || resourceExtname == .jpg || resourceExtname == .jpeg)",
+          "group": "navigation@101"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "nanoBanana.editImageWithReference",
+          "when": "resourceScheme == file && (resourceExtname == .png || resourceExtname == .jpg || resourceExtname == .jpeg)",
+          "group": "navigation@101"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "nanoBanana.editImageWithReference",
+          "when": "resourceScheme == file && (resourceExtname == .png || resourceExtname == .jpg || resourceExtname == .jpeg)",
+          "group": "navigation@101"
         }
       ]
     },

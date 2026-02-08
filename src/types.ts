@@ -38,3 +38,8 @@ export interface GeneratedImagePayload {
   prompt: string;
   modelId: string;
 }
+
+export interface ReferenceImagePayload {
+  bytes: Uint8Array;
+  mimeType: string;
+}

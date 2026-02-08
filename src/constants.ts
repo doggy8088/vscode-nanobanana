@@ -2,9 +2,9 @@ export const EXTENSION_CONFIG_NAMESPACE = 'nanoBanana';
 
 export const COMMANDS = {
   generateFromSelection: 'nanoBanana.generateFromSelection',
-  generateFreeform: 'nanoBanana.generateFreeform',
   setGeminiApiKey: 'nanoBanana.setGeminiApiKey',
-  selectCopilotPromptModel: 'nanoBanana.selectCopilotPromptModel'
+  selectCopilotPromptModel: 'nanoBanana.selectCopilotPromptModel',
+  editImageWithReference: 'nanoBanana.editImageWithReference'
 } as const;
 
 export const CONFIG_KEYS = {

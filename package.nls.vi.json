@@ -5,6 +5,7 @@
   "command.generateFreeform.title": "Nano Banana: Tạo ảnh tự do",
   "command.setGeminiApiKey.title": "Nano Banana: Thiết lập Gemini API Key",
   "command.selectCopilotPromptModel.title": "Nano Banana: Chọn Copilot Prompt Model",
+  "command.editImageWithReference.title": "Chỉnh sửa ảnh với Nano Banana Pro",
   "config.title": "Nano Banana",
   "config.modelId.description": "Model ID tạo ảnh Gemini.",
   "config.geminiApiBaseUrl.description": "Base URL của Gemini API.",

@@ -5,6 +5,7 @@
   "command.generateFreeform.title": "Nano Banana: 자유 입력 이미지 생성",
   "command.setGeminiApiKey.title": "Nano Banana: Gemini API Key 설정",
   "command.selectCopilotPromptModel.title": "Nano Banana: Copilot 프롬프트 모델 선택",
+  "command.editImageWithReference.title": "Nano Banana Pro로 이미지 편집",
   "config.title": "Nano Banana",
   "config.modelId.description": "Gemini 이미지 모델 ID입니다.",
   "config.geminiApiBaseUrl.description": "Gemini API 기본 URL입니다.",

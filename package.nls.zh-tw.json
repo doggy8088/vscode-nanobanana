@@ -5,6 +5,7 @@
   "command.generateFreeform.title": "Nano Banana：任意生圖",
   "command.setGeminiApiKey.title": "Nano Banana：設定 Gemini API Key",
   "command.selectCopilotPromptModel.title": "Nano Banana：選擇 Copilot 提示詞模型",
+  "command.editImageWithReference.title": "使用 Nano Banana Pro 改圖",
   "config.title": "Nano Banana",
   "config.modelId.description": "Gemini 生圖模型 ID。",
   "config.geminiApiBaseUrl.description": "Gemini API 基底網址。",

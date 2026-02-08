@@ -1,5 +1,10 @@
 import { OperationCancelledError, UserFacingError } from '../errors';
-import { GeneratedImagePayload, GeminiGenerateResponse, GeminiPart } from '../types';
+import {
+  GeneratedImagePayload,
+  GeminiGenerateResponse,
+  GeminiPart,
+  ReferenceImagePayload
+} from '../types';
 import { GeminiApiKeyProvider } from './apiKeyStore';
 import { isSupportedAspectRatio } from './stylePresets';
 
@@ -9,6 +14,7 @@ interface GeminiGenerateOptions {
   baseUrl: string;
   imageSize?: string;
   aspectRatio?: string;
+  referenceImages?: readonly ReferenceImagePayload[];
 }
 
 interface LoggerLike {
@@ -79,7 +85,7 @@ export class GeminiImageService {
       contents: [
         {
           role: 'user',
-          parts: [{ text: options.prompt }]
+          parts: buildRequestParts(options.prompt, options.referenceImages)
         }
       ],
       generationConfig: {
@@ -197,6 +203,31 @@ export class GeminiImageService {
       .map((part: GeminiPart) => part.inlineData ?? part.inline_data)
       .find((inlineData) => Boolean(inlineData?.data));
   }
+}
+
+function buildRequestParts(
+  prompt: string,
+  referenceImages: readonly ReferenceImagePayload[] | undefined
+): Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> {
+  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
+    { text: prompt }
+  ];
+
+  if (!referenceImages?.length) {
+    return parts;
+  }
+
+  for (const image of referenceImages) {
+    const encoded = Buffer.from(image.bytes).toString('base64');
+    parts.push({
+      inlineData: {
+        mimeType: image.mimeType,
+        data: encoded
+      }
+    });
+  }
+
+  return parts;
 }
 
 function composeAbortSignal(

@@ -8,7 +8,7 @@ It can build article-cover prompts through the GitHub Copilot Language Model API
 ## Features
 
 - Right-click command from editor selection: **Generate Image with Nano Banana Pro**
-- Freeform image generation command
+- Right-click on image (`.png`, `.jpg`, `.jpeg`) in Editor or Explorer: **Edit Image with Nano Banana Pro**
 - Secure Gemini API key storage (`SecretStorage`)
 - Style picker (12 built-in styles)
 - Aspect ratio picker
@@ -35,9 +35,9 @@ Language behavior:
 ## Commands
 
 - `nanoBanana.generateFromSelection`
-- `nanoBanana.generateFreeform`
 - `nanoBanana.setGeminiApiKey`
 - `nanoBanana.selectCopilotPromptModel` (loads currently available models from VS Code Language Model API)
+- `nanoBanana.editImageWithReference` (edit selected/open image as a Gemini reference image)
 
 > Command labels are localized through `package.nls.*.json`.
 

@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { getExtensionConfig } from './config';
 import {
@@ -20,7 +21,6 @@ import {
 import {
   ASPECT_RATIO_OPTIONS,
   AspectRatioOption,
-  buildStyleEnhancedPrompt,
   resolveAspectRatio,
   resolveStylePreset,
   StylePreset,
@@ -121,6 +121,78 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand(COMMANDS.editImageWithReference, async (...args: unknown[]) => {
+      const config = readRuntimeConfig();
+      const i18n = createRuntimeI18n(config.displayLanguage, vscode.env.language);
+
+      await executeSafely(async () => {
+        const hasApiKey = await ensureGeminiApiKeyConfigured(apiKeyStore, i18n.t);
+        if (!hasApiKey) {
+          return;
+        }
+
+        const imageUri = resolveTargetImageUriFromCommandArgs(args);
+        if (!imageUri) {
+          throw new UserFacingError(i18n.t('error.noImageTarget'));
+        }
+
+        const mimeType = resolveSupportedImageMimeType(imageUri);
+        if (!mimeType) {
+          throw new UserFacingError(i18n.t('error.unsupportedImageFile'));
+        }
+
+        const instruction = await requestInputText(i18n.t('input.editInstructionPrompt'), i18n.t);
+        if (!instruction) {
+          return;
+        }
+
+        const referenceImageBytes = await vscode.workspace.fs.readFile(imageUri);
+        const editPrompt = buildReferenceEditPrompt(instruction);
+
+        logImageGenerationDebug(output, i18n.t, {
+          mode: 'edit',
+          styleLabel: '-',
+          aspectRatio: '-',
+          imageSize: config.imageSize,
+          modelId: config.modelId,
+          prompt: editPrompt
+        });
+
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: i18n.t('progress.editing'),
+            cancellable: true
+          },
+          async (_, token) => {
+            throwIfCancelled(token, i18n.t);
+            const abortBridge = createAbortBridge(token);
+            try {
+              const imagePayload = await geminiService.generateImage(
+                {
+                  prompt: editPrompt,
+                  modelId: config.modelId,
+                  baseUrl: config.geminiApiBaseUrl,
+                  imageSize: config.imageSize,
+                  referenceImages: [{ bytes: referenceImageBytes, mimeType }]
+                },
+                i18n.t,
+                abortBridge.signal
+              );
+
+              const filePath = await fileService.saveToTemp(imagePayload, config.imageOutputFormat);
+              await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
+              vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: filePath }));
+            } finally {
+              abortBridge.dispose();
+            }
+          }
+        );
+      }, output);
+    })
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand(COMMANDS.generateFromSelection, async () => {
       const config = readRuntimeConfig();
       const i18n = createRuntimeI18n(config.displayLanguage, vscode.env.language);
@@ -185,13 +257,19 @@ export function activate(context: vscode.ExtensionContext): void {
                 token
               );
 
+              const finalDirection = await requestOptionalInputText(
+                i18n.t('input.finalDirectionPrompt'),
+                i18n.t
+              );
+              const finalPrompt = mergePromptWithFinalDirection(promptResult.prompt, finalDirection);
+
               logImageGenerationDebug(output, i18n.t, {
                 mode: 'selection',
                 styleLabel,
                 aspectRatio,
                 imageSize: config.imageSize,
                 modelId: config.modelId,
-                prompt: promptResult.prompt
+                prompt: finalPrompt
               });
 
               output.appendLine(i18n.t('log.copilotModelSelected', { modelId: promptResult.modelId }));
@@ -199,7 +277,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
               const imagePayload = await geminiService.generateImage(
                 {
-                  prompt: promptResult.prompt,
+                  prompt: finalPrompt,
                   modelId: config.modelId,
                   baseUrl: config.geminiApiBaseUrl,
                   imageSize: config.imageSize,
@@ -221,93 +299,6 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand(COMMANDS.generateFreeform, async () => {
-      const config = readRuntimeConfig();
-      const i18n = createRuntimeI18n(config.displayLanguage, vscode.env.language);
-
-      await executeSafely(async () => {
-        const hasApiKey = await ensureGeminiApiKeyConfigured(apiKeyStore, i18n.t);
-        if (!hasApiKey) {
-          return;
-        }
-
-        const style = await pickStylePreset(
-          context,
-          config.defaultStyle,
-          config.rememberLastStyle,
-          i18n.t
-        );
-        if (!style) {
-          return;
-        }
-
-        const aspectRatio = await pickAspectRatio(
-          context,
-          config.defaultAspectRatio,
-          config.rememberLastAspectRatio,
-          i18n.t
-        );
-        if (!aspectRatio) {
-          return;
-        }
-
-        const rawPrompt = await requestInputText(i18n.t('input.freeformPrompt'), i18n.t);
-        if (!rawPrompt) {
-          return;
-        }
-
-        const selectionContext = getActiveEditorSelectionText();
-        const promptWithSelection = mergeFreeformPromptWithSelection(rawPrompt, selectionContext);
-        const styleLabel = i18n.t(`style.${style.id}.label`);
-        const enhancedPrompt = buildStyleEnhancedPrompt(
-          promptWithSelection,
-          style,
-          styleLabel,
-          aspectRatio
-        );
-        logImageGenerationDebug(output, i18n.t, {
-          mode: 'freeform',
-          styleLabel,
-          aspectRatio,
-          imageSize: config.imageSize,
-          modelId: config.modelId,
-          prompt: enhancedPrompt
-        });
-
-        await vscode.window.withProgress(
-          {
-            location: vscode.ProgressLocation.Notification,
-            title: i18n.t('progress.generating'),
-            cancellable: true
-          },
-          async (_, token) => {
-            throwIfCancelled(token, i18n.t);
-            const abortBridge = createAbortBridge(token);
-            try {
-              const imagePayload = await geminiService.generateImage(
-                {
-                  prompt: enhancedPrompt,
-                  modelId: config.modelId,
-                  baseUrl: config.geminiApiBaseUrl,
-                  imageSize: config.imageSize,
-                  aspectRatio
-                },
-                i18n.t,
-                abortBridge.signal
-              );
-
-              const filePath = await fileService.saveToTemp(imagePayload, config.imageOutputFormat);
-              await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
-              vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: filePath }));
-            } finally {
-              abortBridge.dispose();
-            }
-          }
-        );
-      }, output);
-    })
-  );
 }
 
 export function deactivate(): void {}
@@ -319,6 +310,25 @@ async function requestInputText(
   const value = await vscode.window.showInputBox({
     title: t('input.dialogTitle'),
     prompt,
+    ignoreFocusOut: true
+  });
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+async function requestOptionalInputText(
+  prompt: string,
+  t: (key: string, vars?: Record<string, string | number>) => string
+): Promise<string | undefined> {
+  const value = await vscode.window.showInputBox({
+    title: t('input.dialogTitle'),
+    prompt,
+    placeHolder: t('input.optionalPlaceholder'),
     ignoreFocusOut: true
   });
 
@@ -505,31 +515,99 @@ function createAbortBridge(token: vscode.CancellationToken): { signal: AbortSign
   };
 }
 
-function getActiveEditorSelectionText(): string | undefined {
-  const editor = vscode.window.activeTextEditor;
-  const selected = editor?.document.getText(editor.selection)?.trim();
-  return selected || undefined;
-}
-
-function mergeFreeformPromptWithSelection(rawPrompt: string, selectionText: string | undefined): string {
-  if (!selectionText) {
-    return rawPrompt;
+function mergePromptWithFinalDirection(basePrompt: string, finalDirection: string | undefined): string {
+  if (!finalDirection) {
+    return basePrompt;
   }
 
-  const maxSelectionLength = 4_000;
-  const truncatedSelection =
-    selectionText.length > maxSelectionLength
-      ? `${selectionText.slice(0, maxSelectionLength)}\n...[selection truncated]`
-      : selectionText;
+  return [
+    basePrompt,
+    '',
+    'Additional user direction (must follow):',
+    finalDirection
+  ].join('\n');
+}
 
-  return `${rawPrompt}\n\nEditor selection context:\n${truncatedSelection}`;
+function buildReferenceEditPrompt(instruction: string): string {
+  return [
+    'Edit the reference image according to the instruction below.',
+    'Preserve the original subject and composition unless the instruction asks for changes.',
+    'Keep output clean and high quality, without watermarks or logos.',
+    '',
+    `Instruction: ${instruction}`
+  ].join('\n');
+}
+
+function resolveTargetImageUriFromCommandArgs(args: unknown[]): vscode.Uri | undefined {
+  const uriFromArgs = extractUriFromArgs(args);
+  if (uriFromArgs && resolveSupportedImageMimeType(uriFromArgs)) {
+    return uriFromArgs;
+  }
+
+  const editorUri = vscode.window.activeTextEditor?.document.uri;
+  if (editorUri && resolveSupportedImageMimeType(editorUri)) {
+    return editorUri;
+  }
+
+  const activeTabInput = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+  if (activeTabInput && hasUriProperty(activeTabInput)) {
+    const tabUri = activeTabInput.uri;
+    if (resolveSupportedImageMimeType(tabUri)) {
+      return tabUri;
+    }
+  }
+
+  return undefined;
+}
+
+function extractUriFromArgs(args: unknown[]): vscode.Uri | undefined {
+  for (const arg of args) {
+    if (arg instanceof vscode.Uri) {
+      return arg;
+    }
+
+    if (Array.isArray(arg)) {
+      const firstUri = arg.find((value) => value instanceof vscode.Uri);
+      if (firstUri instanceof vscode.Uri) {
+        return firstUri;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function hasUriProperty(value: unknown): value is { uri: vscode.Uri } {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    'uri' in value &&
+    (value as { uri?: unknown }).uri instanceof vscode.Uri
+  );
+}
+
+function resolveSupportedImageMimeType(uri: vscode.Uri): string | undefined {
+  if (uri.scheme !== 'file') {
+    return undefined;
+  }
+
+  const ext = path.extname(uri.fsPath).toLowerCase();
+  if (ext === '.png') {
+    return 'image/png';
+  }
+
+  if (ext === '.jpg' || ext === '.jpeg') {
+    return 'image/jpeg';
+  }
+
+  return undefined;
 }
 
 function logImageGenerationDebug(
   output: vscode.OutputChannel,
   t: (key: string, vars?: Record<string, string | number>) => string,
   params: {
-    mode: 'selection' | 'freeform';
+    mode: 'selection' | 'edit';
     styleLabel: string;
     aspectRatio: string;
     imageSize: string;
