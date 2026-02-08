@@ -3,7 +3,7 @@
 A VS Code extension that generates images with Gemini API.
 It can build article-cover prompts through the GitHub Copilot Language Model API, then generate and open the output image in VS Code.
 
-![Banner](https://vscode-nanobanana.gh.miniasp.com/banner.png)
+![Banner](https://vscode-nanobanana.gh.miniasp.com/banner.jpg)
 
 ## Features
 

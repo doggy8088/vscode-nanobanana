@@ -29,6 +29,7 @@
 - Test files: `tests/<module>.test.ts`.
 - Add tests for every behavior change in `src/services/*` and pure helper logic.
 - Run `npm run typecheck && npm run test` before opening a PR.
+- Validate by running `npm run typecheck`, `npm run test`, `npm run build`, and `npm run package:vsix`.
 
 ## Commit & Pull Request Guidelines
 - Follow Conventional Commit style seen in history: `feat: ...`, `feat(scope): ...`, `fix: ...`, `docs: ...`.

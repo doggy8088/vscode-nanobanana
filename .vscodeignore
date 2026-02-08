@@ -10,3 +10,7 @@ tsconfig.json
 vitest.config.ts
 docs/**
 scripts/**
+.github/**
+AGENTS.md
+banner.png
+CHANGELOG.md
