@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.1.2] - 2026-02-09
+
+### Added
+
+- README: added Gemini API key setup steps for image generation/editing.
+
+### Changed
+
+- README wording updated from "article-cover prompts" to generic image-generation prompts.
+- README language list now shows language names with locale codes.
+- `vscode:reinstall` script updated to install `nanobanana-0.1.2.vsix`.
+
 ## [0.1.1] - 2026-02-09
 
 ### Added

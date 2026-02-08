@@ -1,7 +1,7 @@
 # Nano Banana Image Generator
 
 A VS Code extension that generates images with Gemini API.
-It can build article-cover prompts through the GitHub Copilot Language Model API, then generate and open the output image in VS Code.
+It can build prompts for image generation through the GitHub Copilot Language Model API, then generate and open the output image in VS Code.
 
 ![Banner](https://vscode-nanobanana.gh.miniasp.com/banner.jpg)
 
@@ -21,13 +21,13 @@ It can build article-cover prompts through the GitHub Copilot Language Model API
 
 ## Supported UI Languages
 
-- `en`
-- `zh-TW`
-- `zh-CN`
-- `ja`
-- `ko`
-- `th`
-- `vi`
+- English (`en`)
+- Traditional Chinese (`zh-TW`)
+- Simplified Chinese (`zh-CN`)
+- Japanese (`ja`)
+- Korean (`ko`)
+- Thai (`th`)
+- Vietnamese (`vi`)
 
 Language behavior:
 
@@ -57,6 +57,20 @@ Language behavior:
 - `nanoBanana.defaultAspectRatio` (default: `1:1`)
 - `nanoBanana.rememberLastAspectRatio` (default: `true`)
 - `nanoBanana.displayLanguage` (default: `auto`)
+
+## Gemini API Key Setup
+
+`Nano Banana` requires a Gemini API key for image generation and image editing.
+
+1. Go to Google AI Studio and create an API key: `https://aistudio.google.com/apikey`
+2. In VS Code, open Command Palette and run: `Nano Banana: Set Gemini API Key`
+3. Paste your API key and confirm
+4. Start generating/editing images with Nano Banana commands
+
+Notes:
+
+- The key is stored in VS Code `SecretStorage`, not in your workspace files.
+- Never commit your API key to source control.
 
 ## Development
 

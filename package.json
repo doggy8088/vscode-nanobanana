@@ -2,7 +2,7 @@
   "name": "nanobanana",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "doggy8088",
   "icon": "icon.png",
   "repository": "https://github.com/doggy8088/vscode-nanobanana",
@@ -241,7 +241,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "package:vsix": "npx @vscode/vsce package --baseImagesUrl https://vscode-nanobanana.gh.miniasp.com/",
-    "vscode:reinstall": "code --uninstall-extension doggy8088.nanobanana && code --install-extension nanobanana-0.1.1.vsix --force",
+    "vscode:reinstall": "code --uninstall-extension doggy8088.nanobanana && code --install-extension nanobanana-0.1.2.vsix --force",
     "publish:vscode": "pwsh -File scripts/publish-vscode.ps1"
   },
   "devDependencies": {
