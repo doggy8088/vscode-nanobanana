@@ -207,8 +207,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 config.imageOutputFormat,
                 config.outputDirectory
               );
-              await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
-              vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: filePath }));
+              await notifyAndOpenGeneratedImage(filePath, i18n.t);
             } finally {
               abortBridge.dispose();
             }
@@ -350,8 +349,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 config.imageOutputFormat,
                 config.outputDirectory
               );
-              await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
-              vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: filePath }));
+              await notifyAndOpenGeneratedImage(filePath, i18n.t);
               return {
                 imagePayload,
                 styleLabel,
@@ -428,8 +426,7 @@ export function activate(context: vscode.ExtensionContext): void {
             config.imageOutputFormat,
             config.outputDirectory
           );
-          await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(refinedFilePath));
-          vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: refinedFilePath }));
+          await notifyAndOpenGeneratedImage(refinedFilePath, i18n.t);
           latestImagePayload = refinedImagePayload;
           latestImageSize = refineImageSize;
         }
@@ -440,6 +437,14 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {}
+
+async function notifyAndOpenGeneratedImage(
+  filePath: string,
+  t: (key: string, vars?: Record<string, string | number>) => string
+): Promise<void> {
+  vscode.window.showInformationMessage(t('info.imageGenerated', { path: filePath }));
+  await vscode.commands.executeCommand(COMMANDS.openImageEditor, vscode.Uri.file(filePath));
+}
 
 async function requestInputText(
   prompt: string,
@@ -1255,13 +1260,13 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
         displayRect = { x, y, w, h };
       }
 
-      function drawAnnotation(target, annotation, w, h) {
+      function drawAnnotation(target, annotation, w, h, offsetX = 0, offsetY = 0) {
         target.save();
         target.strokeStyle = annotation.color;
         target.fillStyle = annotation.color;
         target.lineWidth = annotation.strokeWidth;
-        const x = annotation.x * w;
-        const y = annotation.y * h;
+        const x = offsetX + annotation.x * w;
+        const y = offsetY + annotation.y * h;
         const rw = annotation.w * w;
         const rh = annotation.h * h;
         if (annotation.type === 'rect') {
@@ -1288,7 +1293,7 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
           ctx.drawImage(image, displayRect.x, displayRect.y, displayRect.w, displayRect.h);
         }
         for (const annotation of annotations) {
-          drawAnnotation(ctx, annotation, displayRect.w, displayRect.h);
+          drawAnnotation(ctx, annotation, displayRect.w, displayRect.h, displayRect.x, displayRect.y);
         }
         if (drawing) {
           drawAnnotation(
@@ -1303,7 +1308,9 @@ function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
               strokeWidth: 2
             },
             displayRect.w,
-            displayRect.h
+            displayRect.h,
+            displayRect.x,
+            displayRect.y
           );
         }
       }
