@@ -7,7 +7,10 @@ export interface ModelDescriptor {
 }
 
 function normalize(value: string | undefined): string {
-  return (value ?? '').trim().toLowerCase();
+  return (value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
 }
 
 export function getModelIdentifier(model: ModelDescriptor): string {

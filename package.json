@@ -1,11 +1,11 @@
 {
-  "name": "nano-banana",
+  "name": "nanobanana",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
   "version": "0.1.0",
   "publisher": "doggy8088",
   "icon": "icon.png",
-  "repository": "https://github.com/doggy8088/vscode-nano-banana",
+  "repository": "https://github.com/doggy8088/vscode-nanobanana",
   "engines": {
     "vscode": "^1.108.0"
   },
@@ -119,6 +119,31 @@
         },
         "nanoBanana.copilotPromptModel": {
           "type": "string",
+          "enum": [
+            "auto",
+            "gpt-4.1",
+            "gpt-5",
+            "gpt-5-mini",
+            "gpt-5-codex",
+            "gpt-5.1",
+            "gpt-5.1-codex",
+            "gpt-5.1-codex-mini",
+            "gpt-5.1-codex-max",
+            "gpt-5.2",
+            "gpt-5.2-codex",
+            "claude-haiku-4.5",
+            "claude-opus-4.1",
+            "claude-opus-4.5",
+            "claude-opus-4.6",
+            "claude-opus-4.6-fast",
+            "claude-sonnet-4",
+            "claude-sonnet-4.5",
+            "gemini-2.5-pro",
+            "gemini-3-flash",
+            "gemini-3-pro",
+            "grok-code-fast-1",
+            "raptor-mini"
+          ],
           "default": "auto",
           "description": "%config.copilotPromptModel.description%"
         },

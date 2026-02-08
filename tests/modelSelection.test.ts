@@ -53,6 +53,16 @@ describe('selectPreferredModel', () => {
     expect(selected.id).toBe('openai-gpt-4.1-preview');
   });
 
+  it('matches regardless of punctuation differences', () => {
+    const models = [
+      { id: 'model-a', name: 'Claude Opus 4.6 (fast mode) (preview)' },
+      { id: 'model-b', name: 'Some Other Model' }
+    ];
+
+    const selected = selectPreferredModel(models, 'claude-opus-4.6-fast');
+    expect(selected.id).toBe('model-a');
+  });
+
   it('returns first model when preference not found', () => {
     const models = [{ id: 'model-a' }, { id: 'model-b' }];
     const selected = selectPreferredModel(models, 'missing-model');
