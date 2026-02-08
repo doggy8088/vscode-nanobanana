@@ -6,6 +6,7 @@
   "command.setGeminiApiKey.title": "Nano Banana：設定 Gemini API Key",
   "command.selectCopilotPromptModel.title": "Nano Banana：選擇 Copilot 提示詞模型",
   "command.editImageWithReference.title": "使用 Nano Banana Pro 改圖",
+  "command.openImageEditor.title": "開啟 Nano Banana 圖片編輯器",
   "config.title": "Nano Banana",
   "config.modelId.description": "Gemini 生圖模型 ID。",
   "config.geminiApiBaseUrl.description": "Gemini API 基底網址。",

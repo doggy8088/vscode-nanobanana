@@ -29,7 +29,8 @@
     "onCommand:nanoBanana.generateFromSelection",
     "onCommand:nanoBanana.setGeminiApiKey",
     "onCommand:nanoBanana.selectCopilotPromptModel",
-    "onCommand:nanoBanana.editImageWithReference"
+    "onCommand:nanoBanana.editImageWithReference",
+    "onCommand:nanoBanana.openImageEditor"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -49,6 +50,10 @@
       {
         "command": "nanoBanana.editImageWithReference",
         "title": "%command.editImageWithReference.title%"
+      },
+      {
+        "command": "nanoBanana.openImageEditor",
+        "title": "%command.openImageEditor.title%"
       }
     ],
     "menus": {
@@ -62,6 +67,11 @@
           "command": "nanoBanana.editImageWithReference",
           "when": "resourceScheme == file && (resourceExtname == .png || resourceExtname == .jpg || resourceExtname == .jpeg)",
           "group": "navigation@101"
+        },
+        {
+          "command": "nanoBanana.openImageEditor",
+          "when": "resourceScheme == file && (resourceExtname == .png || resourceExtname == .jpg || resourceExtname == .jpeg)",
+          "group": "navigation@102"
         }
       ],
       "editor/title/context": [
@@ -69,6 +79,11 @@
           "command": "nanoBanana.editImageWithReference",
           "when": "resourceScheme == file && (resourceExtname == .png || resourceExtname == .jpg || resourceExtname == .jpeg)",
           "group": "navigation@101"
+        },
+        {
+          "command": "nanoBanana.openImageEditor",
+          "when": "resourceScheme == file && (resourceExtname == .png || resourceExtname == .jpg || resourceExtname == .jpeg)",
+          "group": "navigation@102"
         }
       ],
       "explorer/context": [
@@ -76,6 +91,11 @@
           "command": "nanoBanana.editImageWithReference",
           "when": "resourceScheme == file && (resourceExtname == .png || resourceExtname == .jpg || resourceExtname == .jpeg)",
           "group": "navigation@101"
+        },
+        {
+          "command": "nanoBanana.openImageEditor",
+          "when": "resourceScheme == file && (resourceExtname == .png || resourceExtname == .jpg || resourceExtname == .jpeg)",
+          "group": "navigation@102"
         }
       ]
     },

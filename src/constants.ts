@@ -4,7 +4,8 @@ export const COMMANDS = {
   generateFromSelection: 'nanoBanana.generateFromSelection',
   setGeminiApiKey: 'nanoBanana.setGeminiApiKey',
   selectCopilotPromptModel: 'nanoBanana.selectCopilotPromptModel',
-  editImageWithReference: 'nanoBanana.editImageWithReference'
+  editImageWithReference: 'nanoBanana.editImageWithReference',
+  openImageEditor: 'nanoBanana.openImageEditor'
 } as const;
 
 export const CONFIG_KEYS = {

@@ -9,7 +9,7 @@ import {
   WORKSPACE_STATE_KEYS
 } from './constants';
 import { OperationCancelledError, UserFacingError } from './errors';
-import { createRuntimeI18n } from './i18n';
+import { createRuntimeI18n, RuntimeI18n } from './i18n';
 import { ApiKeyStore } from './services/apiKeyStore';
 import { CopilotPromptService } from './services/copilotPromptService';
 import { GeminiImageService } from './services/geminiImageService';
@@ -27,9 +27,23 @@ import {
   STYLE_PRESETS,
   textPolicyInstruction
 } from './services/stylePresets';
+import { ReferenceImagePayload } from './types';
 
 const IMAGE_SIZE_OPTIONS = ['1K', '2K', '4K'] as const;
 type ImageSizeOption = (typeof IMAGE_SIZE_OPTIONS)[number];
+interface RuntimeConfig {
+  modelId: string;
+  geminiApiBaseUrl: string;
+  copilotPromptModel: string;
+  imageOutputFormat: string;
+  outputDirectory: string;
+  imageSize: string;
+  defaultStyle: string;
+  rememberLastStyle: boolean;
+  defaultAspectRatio: string;
+  rememberLastAspectRatio: boolean;
+  displayLanguage: string;
+}
 
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel('Nano Banana');
@@ -200,6 +214,40 @@ export function activate(context: vscode.ExtensionContext): void {
             }
           }
         );
+      }, output);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(COMMANDS.openImageEditor, async (...args: unknown[]) => {
+      const config = readRuntimeConfig();
+      const i18n = createRuntimeI18n(config.displayLanguage, vscode.env.language);
+
+      await executeSafely(async () => {
+        const imageUri =
+          resolveTargetImageUriFromCommandArgs(args) ??
+          (await pickImageUriFromOpenDialog(i18n.t));
+        if (!imageUri) {
+          throw new UserFacingError(i18n.t('error.noImageTarget'));
+        }
+
+        const mimeType = resolveSupportedImageMimeType(imageUri);
+        if (!mimeType) {
+          throw new UserFacingError(i18n.t('error.unsupportedImageFile'));
+        }
+
+        const imageBytes = await vscode.workspace.fs.readFile(imageUri);
+        openImageEditorPanel({
+          config,
+          i18n,
+          output,
+          apiKeyStore,
+          geminiService,
+          fileService,
+          initialImageBytes: imageBytes,
+          initialMimeType: mimeType,
+          initialTitle: path.basename(imageUri.fsPath)
+        });
       }, output);
     })
   );
@@ -720,11 +768,755 @@ function normalizeImageSize(value: string | undefined): ImageSizeOption {
   return IMAGE_SIZE_OPTIONS.includes(normalized as ImageSizeOption) ? (normalized as ImageSizeOption) : '1K';
 }
 
+async function pickImageUriFromOpenDialog(
+  t: (key: string, vars?: Record<string, string | number>) => string
+): Promise<vscode.Uri | undefined> {
+  const picked = await vscode.window.showOpenDialog({
+    title: t('panel.imageEditor.pickImageTitle'),
+    canSelectMany: false,
+    canSelectFiles: true,
+    canSelectFolders: false,
+    filters: {
+      Images: ['png', 'jpg', 'jpeg']
+    }
+  });
+
+  return picked?.[0];
+}
+
+function openImageEditorPanel(params: {
+  config: RuntimeConfig;
+  i18n: RuntimeI18n;
+  output: vscode.OutputChannel;
+  apiKeyStore: ApiKeyStore;
+  geminiService: GeminiImageService;
+  fileService: ImageFileService;
+  initialImageBytes: Uint8Array;
+  initialMimeType: string;
+  initialTitle: string;
+}): void {
+  const panel = vscode.window.createWebviewPanel(
+    'nanoBananaImageEditor',
+    `${params.i18n.t('panel.imageEditor.title')}: ${params.initialTitle}`,
+    vscode.ViewColumn.Active,
+    {
+      enableScripts: true,
+      retainContextWhenHidden: true
+    }
+  );
+
+  let currentImageBytes: Uint8Array = Buffer.from(params.initialImageBytes);
+  let currentImageMimeType = params.initialMimeType;
+  const defaultImageSize = normalizeImageSize(params.config.imageSize);
+  let busy = false;
+
+  panel.webview.html = buildImageEditorWebviewHtml(panel.webview);
+
+  const postMessage = (message: unknown): void => {
+    void panel.webview.postMessage(message);
+  };
+
+  panel.webview.onDidReceiveMessage(async (message: unknown) => {
+    if (!isMessageRecord(message) || typeof message.type !== 'string') {
+      return;
+    }
+
+    if (message.type === 'ready') {
+      postMessage({
+        type: 'init',
+        imageDataUrl: toDataUrl(currentImageMimeType, currentImageBytes),
+        defaultImageSize,
+        labels: {
+          rect: params.i18n.t('panel.imageEditor.tool.rect'),
+          ellipse: params.i18n.t('panel.imageEditor.tool.ellipse'),
+          text: params.i18n.t('panel.imageEditor.tool.text'),
+          undo: params.i18n.t('panel.imageEditor.action.undo'),
+          clear: params.i18n.t('panel.imageEditor.action.clear'),
+          generate: params.i18n.t('panel.imageEditor.action.generate'),
+          promptLabel: params.i18n.t('panel.imageEditor.promptLabel'),
+          promptPlaceholder: params.i18n.t('panel.imageEditor.promptPlaceholder'),
+          annotationTextLabel: params.i18n.t('panel.imageEditor.annotationTextLabel'),
+          annotationTextPlaceholder: params.i18n.t('panel.imageEditor.annotationTextPlaceholder'),
+          imageSizeLabel: params.i18n.t('panel.imageEditor.imageSizeLabel'),
+          statusReady: params.i18n.t('panel.imageEditor.status.ready'),
+          statusProcessing: params.i18n.t('panel.imageEditor.status.processing'),
+          promptRequired: params.i18n.t('error.editorPromptEmpty')
+        }
+      });
+      return;
+    }
+
+    if (message.type !== 'apply' || busy) {
+      return;
+    }
+
+    const prompt = typeof message.prompt === 'string' ? message.prompt.trim() : '';
+    if (!prompt) {
+      postMessage({ type: 'error', message: params.i18n.t('error.editorPromptEmpty') });
+      return;
+    }
+
+    const requestedImageSize = normalizeImageSize(
+      typeof message.imageSize === 'string' ? message.imageSize : defaultImageSize
+    );
+
+    const overlayDataUrl = typeof message.overlayDataUrl === 'string' ? message.overlayDataUrl : '';
+    const hasAnnotations = message.hasAnnotations === true;
+    const parsedOverlay = hasAnnotations ? parseDataUrl(overlayDataUrl) : undefined;
+
+    busy = true;
+    postMessage({
+      type: 'state',
+      busy: true,
+      message: params.i18n.t('panel.imageEditor.status.processing')
+    });
+
+    try {
+      const hasApiKey = await ensureGeminiApiKeyConfigured(params.apiKeyStore, params.i18n.t);
+      if (!hasApiKey) {
+        return;
+      }
+
+      const references: ReferenceImagePayload[] = [
+        { bytes: currentImageBytes, mimeType: currentImageMimeType }
+      ];
+      if (parsedOverlay && parsedOverlay.mimeType.startsWith('image/')) {
+        references.push(parsedOverlay);
+      }
+
+      const editorPrompt = buildEditorPanelPrompt(prompt, Boolean(parsedOverlay));
+      logImageGenerationDebug(params.output, params.i18n.t, {
+        mode: 'editor-panel',
+        styleLabel: '-',
+        aspectRatio: '-',
+        imageSize: requestedImageSize,
+        modelId: params.config.modelId,
+        prompt: editorPrompt
+      });
+
+      const imagePayload = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: params.i18n.t('progress.editing'),
+          cancellable: true
+        },
+        async (_, token) => {
+          throwIfCancelled(token, params.i18n.t);
+          const abortBridge = createAbortBridge(token);
+          try {
+            return await params.geminiService.generateImage(
+              {
+                prompt: editorPrompt,
+                modelId: params.config.modelId,
+                baseUrl: params.config.geminiApiBaseUrl,
+                imageSize: requestedImageSize,
+                referenceImages: references
+              },
+              params.i18n.t,
+              abortBridge.signal
+            );
+          } finally {
+            abortBridge.dispose();
+          }
+        }
+      );
+
+      const filePath = await params.fileService.saveToTemp(
+        imagePayload,
+        params.config.imageOutputFormat,
+        params.config.outputDirectory
+      );
+
+      currentImageBytes = imagePayload.bytes;
+      currentImageMimeType = imagePayload.mimeType;
+      postMessage({
+        type: 'image-updated',
+        imageDataUrl: toDataUrl(currentImageMimeType, currentImageBytes),
+        path: filePath
+      });
+      vscode.window.showInformationMessage(params.i18n.t('info.imageGenerated', { path: filePath }));
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : String(error);
+      const detail = error instanceof Error ? (error.stack ?? error.message) : String(error);
+      params.output.appendLine(detail);
+      postMessage({ type: 'error', message: messageText });
+      vscode.window.showErrorMessage(messageText);
+    } finally {
+      busy = false;
+      postMessage({ type: 'state', busy: false, message: params.i18n.t('panel.imageEditor.status.ready') });
+    }
+  });
+}
+
+function buildEditorPanelPrompt(userPrompt: string, hasOverlay: boolean): string {
+  return [
+    'Edit the reference image according to the user instruction.',
+    hasOverlay
+      ? 'A second reference image contains visual annotations (boxes/circles/text). Prioritize those marked regions when applying edits.'
+      : 'No visual annotations are provided. Apply the instruction globally while preserving image quality.',
+    'Preserve unchanged regions unless the instruction explicitly requests broader edits.',
+    `Instruction: ${userPrompt}`
+  ].join('\n');
+}
+
+function toDataUrl(mimeType: string, bytes: Uint8Array): string {
+  return `data:${mimeType};base64,${Buffer.from(bytes).toString('base64')}`;
+}
+
+function parseDataUrl(value: string): ReferenceImagePayload | undefined {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('data:')) {
+    return undefined;
+  }
+
+  const commaIndex = trimmed.indexOf(',');
+  if (commaIndex <= 5) {
+    return undefined;
+  }
+
+  const meta = trimmed.slice(5, commaIndex);
+  const payload = trimmed.slice(commaIndex + 1);
+  if (!meta.endsWith(';base64') || !payload) {
+    return undefined;
+  }
+
+  const mimeType = meta.slice(0, -7).toLowerCase();
+  if (!mimeType) {
+    return undefined;
+  }
+
+  return {
+    bytes: Buffer.from(payload, 'base64'),
+    mimeType
+  };
+}
+
+function buildImageEditorWebviewHtml(webview: vscode.Webview): string {
+  const nonce = createNonce();
+  const csp = [
+    "default-src 'none'",
+    "img-src data: https:",
+    "style-src 'unsafe-inline'",
+    `script-src 'nonce-${nonce}'`
+  ].join('; ');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="${csp}" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nano Banana Image Editor</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+    body {
+      margin: 0;
+      padding: 12px;
+      font-family: var(--vscode-font-family);
+      color: var(--vscode-foreground);
+      background: var(--vscode-editor-background);
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 12px;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+    .layout {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 240px;
+      gap: 12px;
+    }
+    .canvas-panel {
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
+    }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      padding: 8px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      background: var(--vscode-sideBar-background);
+    }
+    .toolbar button {
+      padding: 6px 8px;
+    }
+    .toolbar button.active {
+      border-color: var(--vscode-focusBorder);
+      outline: 1px solid var(--vscode-focusBorder);
+    }
+    .canvas-host {
+      position: relative;
+      min-height: 0;
+      background: linear-gradient(45deg, #0000 25%, #8883 25%, #8883 50%, #0000 50%, #0000 75%, #8883 75%, #8883 100%);
+      background-size: 24px 24px;
+    }
+    #imageCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      cursor: crosshair;
+    }
+    .side-panel {
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      padding: 10px;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+      background: var(--vscode-editorWidget-background);
+    }
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+    .field input,
+    .field select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      color: var(--vscode-input-foreground);
+      background: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 4px;
+      padding: 6px 8px;
+    }
+    .bottom {
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+      background: var(--vscode-editorWidget-background);
+    }
+    #promptInput {
+      min-height: 82px;
+      resize: vertical;
+    }
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #status {
+      font-size: 12px;
+      opacity: 0.9;
+      min-height: 18px;
+    }
+    #status.error {
+      color: var(--vscode-errorForeground);
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div class="canvas-panel">
+      <div class="toolbar">
+        <button id="toolRect" type="button">Rect</button>
+        <button id="toolEllipse" type="button">Circle</button>
+        <button id="toolText" type="button">Text</button>
+        <button id="btnUndo" type="button">Undo</button>
+        <button id="btnClear" type="button">Clear</button>
+      </div>
+      <div class="canvas-host" id="canvasHost">
+        <canvas id="imageCanvas"></canvas>
+      </div>
+    </div>
+    <aside class="side-panel">
+      <div class="field">
+        <label id="labelImageSize">Image Size</label>
+        <select id="imageSizeSelect">
+          <option value="1K">1K</option>
+          <option value="2K">2K</option>
+          <option value="4K">4K</option>
+        </select>
+      </div>
+      <div class="field">
+        <label id="labelAnnotationText">Annotation Text</label>
+        <input id="annotationTextInput" type="text" placeholder="Type text and click image to place." />
+      </div>
+    </aside>
+  </div>
+  <div class="bottom">
+    <div class="field">
+      <label id="labelPrompt">Prompt</label>
+      <textarea id="promptInput" placeholder="Describe how to edit this image."></textarea>
+    </div>
+    <div class="actions">
+      <button id="btnGenerate" type="button">Start Editing</button>
+      <div id="status"></div>
+    </div>
+  </div>
+  <script nonce="${nonce}">
+    (() => {
+      const vscode = acquireVsCodeApi();
+      const canvas = document.getElementById('imageCanvas');
+      const canvasHost = document.getElementById('canvasHost');
+      const ctx = canvas.getContext('2d');
+      const promptInput = document.getElementById('promptInput');
+      const annotationTextInput = document.getElementById('annotationTextInput');
+      const imageSizeSelect = document.getElementById('imageSizeSelect');
+      const statusEl = document.getElementById('status');
+      const btnGenerate = document.getElementById('btnGenerate');
+      const btnUndo = document.getElementById('btnUndo');
+      const btnClear = document.getElementById('btnClear');
+      const toolRect = document.getElementById('toolRect');
+      const toolEllipse = document.getElementById('toolEllipse');
+      const toolText = document.getElementById('toolText');
+      const labelPrompt = document.getElementById('labelPrompt');
+      const labelAnnotationText = document.getElementById('labelAnnotationText');
+      const labelImageSize = document.getElementById('labelImageSize');
+
+      let image = null;
+      let imageLoaded = false;
+      let tool = 'rect';
+      let drawing = null;
+      let busy = false;
+      let displayRect = { x: 0, y: 0, w: 1, h: 1 };
+      let labels = {
+        rect: 'Rect',
+        ellipse: 'Circle',
+        text: 'Text',
+        undo: 'Undo',
+        clear: 'Clear',
+        generate: 'Start Editing',
+        promptLabel: 'Prompt',
+        promptPlaceholder: 'Describe how to edit this image.',
+        annotationTextLabel: 'Annotation Text',
+        annotationTextPlaceholder: 'Type text and click image to place.',
+        imageSizeLabel: 'Image Size',
+        statusReady: 'Ready',
+        statusProcessing: 'Processing...',
+        promptRequired: 'Prompt is required.'
+      };
+      const annotations = [];
+
+      function setBusy(nextBusy) {
+        busy = nextBusy;
+        btnGenerate.disabled = busy;
+      }
+
+      function setStatus(text, isError = false) {
+        statusEl.textContent = text || '';
+        statusEl.classList.toggle('error', Boolean(isError));
+      }
+
+      function setLabels(nextLabels) {
+        labels = Object.assign(labels, nextLabels || {});
+        toolRect.textContent = labels.rect;
+        toolEllipse.textContent = labels.ellipse;
+        toolText.textContent = labels.text;
+        btnUndo.textContent = labels.undo;
+        btnClear.textContent = labels.clear;
+        btnGenerate.textContent = labels.generate;
+        labelPrompt.textContent = labels.promptLabel;
+        labelAnnotationText.textContent = labels.annotationTextLabel;
+        labelImageSize.textContent = labels.imageSizeLabel;
+        promptInput.placeholder = labels.promptPlaceholder;
+        annotationTextInput.placeholder = labels.annotationTextPlaceholder;
+      }
+
+      function setTool(nextTool) {
+        tool = nextTool;
+        toolRect.classList.toggle('active', tool === 'rect');
+        toolEllipse.classList.toggle('active', tool === 'ellipse');
+        toolText.classList.toggle('active', tool === 'text');
+      }
+
+      function resizeCanvas() {
+        const rect = canvasHost.getBoundingClientRect();
+        const width = Math.max(1, Math.floor(rect.width));
+        const height = Math.max(1, Math.floor(rect.height));
+        if (canvas.width === width && canvas.height === height) {
+          return;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        draw();
+      }
+
+      function updateDisplayRect() {
+        if (!imageLoaded) {
+          displayRect = { x: 0, y: 0, w: canvas.width, h: canvas.height };
+          return;
+        }
+        const scale = Math.min(canvas.width / image.naturalWidth, canvas.height / image.naturalHeight);
+        const w = image.naturalWidth * scale;
+        const h = image.naturalHeight * scale;
+        const x = (canvas.width - w) / 2;
+        const y = (canvas.height - h) / 2;
+        displayRect = { x, y, w, h };
+      }
+
+      function drawAnnotation(target, annotation, w, h) {
+        target.save();
+        target.strokeStyle = annotation.color;
+        target.fillStyle = annotation.color;
+        target.lineWidth = annotation.strokeWidth;
+        const x = annotation.x * w;
+        const y = annotation.y * h;
+        const rw = annotation.w * w;
+        const rh = annotation.h * h;
+        if (annotation.type === 'rect') {
+          target.strokeRect(x, y, rw, rh);
+        } else if (annotation.type === 'ellipse') {
+          target.beginPath();
+          target.ellipse(x + rw / 2, y + rh / 2, Math.abs(rw / 2), Math.abs(rh / 2), 0, 0, Math.PI * 2);
+          target.stroke();
+        } else if (annotation.type === 'text') {
+          const fontSize = Math.max(12, Math.round(h * 0.03));
+          target.font = fontSize + 'px sans-serif';
+          target.fillText(annotation.text, x, y);
+        }
+        target.restore();
+      }
+
+      function draw() {
+        if (!ctx) {
+          return;
+        }
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        updateDisplayRect();
+        if (imageLoaded) {
+          ctx.drawImage(image, displayRect.x, displayRect.y, displayRect.w, displayRect.h);
+        }
+        for (const annotation of annotations) {
+          drawAnnotation(ctx, annotation, displayRect.w, displayRect.h);
+        }
+        if (drawing) {
+          drawAnnotation(
+            ctx,
+            {
+              type: drawing.type,
+              x: Math.min(drawing.start.x, drawing.current.x),
+              y: Math.min(drawing.start.y, drawing.current.y),
+              w: Math.abs(drawing.current.x - drawing.start.x),
+              h: Math.abs(drawing.current.y - drawing.start.y),
+              color: '#ff4d4f',
+              strokeWidth: 2
+            },
+            displayRect.w,
+            displayRect.h
+          );
+        }
+      }
+
+      function pointToNormalized(event) {
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        if (
+          x < displayRect.x ||
+          y < displayRect.y ||
+          x > displayRect.x + displayRect.w ||
+          y > displayRect.y + displayRect.h
+        ) {
+          return null;
+        }
+        return {
+          x: (x - displayRect.x) / displayRect.w,
+          y: (y - displayRect.y) / displayRect.h
+        };
+      }
+
+      function commitDrawing() {
+        if (!drawing) {
+          return;
+        }
+        const x = Math.min(drawing.start.x, drawing.current.x);
+        const y = Math.min(drawing.start.y, drawing.current.y);
+        const w = Math.abs(drawing.current.x - drawing.start.x);
+        const h = Math.abs(drawing.current.y - drawing.start.y);
+        if (w > 0.002 && h > 0.002) {
+          annotations.push({
+            type: drawing.type,
+            x,
+            y,
+            w,
+            h,
+            color: '#ff4d4f',
+            strokeWidth: 2
+          });
+        }
+        drawing = null;
+        draw();
+      }
+
+      function exportOverlayDataUrl() {
+        if (!imageLoaded || annotations.length === 0) {
+          return '';
+        }
+        const off = document.createElement('canvas');
+        off.width = image.naturalWidth;
+        off.height = image.naturalHeight;
+        const offCtx = off.getContext('2d');
+        if (!offCtx) {
+          return '';
+        }
+        for (const annotation of annotations) {
+          drawAnnotation(offCtx, annotation, off.width, off.height);
+        }
+        return off.toDataURL('image/png');
+      }
+
+      async function loadImage(dataUrl) {
+        await new Promise((resolve, reject) => {
+          const next = new Image();
+          next.onload = () => {
+            image = next;
+            imageLoaded = true;
+            resolve();
+          };
+          next.onerror = () => reject(new Error('Failed to load image.'));
+          next.src = dataUrl;
+        });
+        annotations.length = 0;
+        drawing = null;
+        draw();
+      }
+
+      toolRect.addEventListener('click', () => setTool('rect'));
+      toolEllipse.addEventListener('click', () => setTool('ellipse'));
+      toolText.addEventListener('click', () => setTool('text'));
+      btnUndo.addEventListener('click', () => {
+        annotations.pop();
+        draw();
+      });
+      btnClear.addEventListener('click', () => {
+        annotations.length = 0;
+        draw();
+      });
+      btnGenerate.addEventListener('click', () => {
+        if (busy) {
+          return;
+        }
+        const prompt = promptInput.value.trim();
+        if (!prompt) {
+          setStatus(labels.promptRequired, true);
+          return;
+        }
+        const hasAnnotations = annotations.length > 0;
+        vscode.postMessage({
+          type: 'apply',
+          prompt,
+          imageSize: imageSizeSelect.value,
+          hasAnnotations,
+          overlayDataUrl: hasAnnotations ? exportOverlayDataUrl() : ''
+        });
+      });
+
+      canvas.addEventListener('pointerdown', (event) => {
+        if (busy || !imageLoaded) {
+          return;
+        }
+        const point = pointToNormalized(event);
+        if (!point) {
+          return;
+        }
+        if (tool === 'text') {
+          const text = annotationTextInput.value.trim();
+          if (!text) {
+            setStatus(labels.annotationTextPlaceholder, true);
+            return;
+          }
+          annotations.push({
+            type: 'text',
+            x: point.x,
+            y: point.y,
+            w: 0,
+            h: 0,
+            text,
+            color: '#ff4d4f',
+            strokeWidth: 2
+          });
+          draw();
+          return;
+        }
+        drawing = { type: tool, start: point, current: point };
+      });
+
+      canvas.addEventListener('pointermove', (event) => {
+        if (!drawing) {
+          return;
+        }
+        const point = pointToNormalized(event);
+        if (!point) {
+          return;
+        }
+        drawing.current = point;
+        draw();
+      });
+
+      canvas.addEventListener('pointerup', commitDrawing);
+      canvas.addEventListener('pointerleave', commitDrawing);
+
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+      setTool('rect');
+      setStatus(labels.statusReady);
+
+      window.addEventListener('message', async (event) => {
+        const message = event.data;
+        if (!message || typeof message.type !== 'string') {
+          return;
+        }
+        if (message.type === 'init') {
+          setLabels(message.labels || {});
+          imageSizeSelect.value = message.defaultImageSize || '1K';
+          await loadImage(message.imageDataUrl);
+          setStatus(labels.statusReady);
+          return;
+        }
+        if (message.type === 'image-updated') {
+          await loadImage(message.imageDataUrl);
+          setStatus(message.path ? labels.statusReady + ' -> ' + message.path : labels.statusReady);
+          return;
+        }
+        if (message.type === 'state') {
+          setBusy(Boolean(message.busy));
+          if (message.message) {
+            setStatus(message.message);
+          }
+          return;
+        }
+        if (message.type === 'error') {
+          setStatus(message.message || 'Error', true);
+        }
+      });
+
+      vscode.postMessage({ type: 'ready' });
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+function isMessageRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object';
+}
+
+function createNonce(): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let nonce = '';
+  for (let i = 0; i < 32; i += 1) {
+    nonce += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+  }
+
+  return nonce;
+}
+
 function logImageGenerationDebug(
   output: vscode.OutputChannel,
   t: (key: string, vars?: Record<string, string | number>) => string,
   params: {
-    mode: 'selection' | 'selection-refine' | 'edit';
+    mode: 'selection' | 'selection-refine' | 'edit' | 'editor-panel';
     styleLabel: string;
     aspectRatio: string;
     imageSize: string;
