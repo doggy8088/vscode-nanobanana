@@ -1,7 +1,7 @@
 {
   "name": "vscode-image-generator",
-  "displayName": "Nano Banana Pro Image Generator",
-  "description": "Generate images in VS Code using Gemini API, with article-cover prompt generation via GitHub Copilot Language Model API.",
+  "displayName": "%extension.displayName%",
+  "description": "%extension.description%",
   "version": "0.1.0",
   "publisher": "doggy8088",
   "icon": "icon.png",
@@ -27,15 +27,15 @@
     "commands": [
       {
         "command": "nanoBanana.generateFromSelection",
-        "title": "使用 Nano Banana Pro 生圖"
+        "title": "%command.generateFromSelection.title%"
       },
       {
         "command": "nanoBanana.generateFreeform",
-        "title": "Nano Banana: 任意生圖"
+        "title": "%command.generateFreeform.title%"
       },
       {
         "command": "nanoBanana.setGeminiApiKey",
-        "title": "Nano Banana: 設定 Gemini API Key"
+        "title": "%command.setGeminiApiKey.title%"
       }
     ],
     "menus": {
@@ -49,22 +49,22 @@
     },
     "configuration": {
       "type": "object",
-      "title": "Nano Banana",
+      "title": "%config.title%",
       "properties": {
         "nanoBanana.modelId": {
           "type": "string",
           "default": "gemini-3-pro-image-preview",
-          "description": "Gemini image model ID. Supports legacy alias gpt-3-pro-image-preview."
+          "description": "%config.modelId.description%"
         },
         "nanoBanana.geminiApiBaseUrl": {
           "type": "string",
           "default": "https://generativelanguage.googleapis.com/v1beta",
-          "description": "Gemini API base URL."
+          "description": "%config.geminiApiBaseUrl.description%"
         },
         "nanoBanana.copilotPromptModel": {
           "type": "string",
           "default": "gpt-4.1",
-          "description": "Preferred Copilot model id/family for prompt generation."
+          "description": "%config.copilotPromptModel.description%"
         },
         "nanoBanana.imageOutputFormat": {
           "type": "string",
@@ -72,17 +72,17 @@
             "png"
           ],
           "default": "png",
-          "description": "Output image format for saved files."
+          "description": "%config.imageOutputFormat.description%"
         },
         "nanoBanana.defaultStyle": {
           "type": "string",
           "default": "article-cover",
-          "description": "Default image style preset id."
+          "description": "%config.defaultStyle.description%"
         },
         "nanoBanana.rememberLastStyle": {
           "type": "boolean",
           "default": true,
-          "description": "Remember last selected style in workspace."
+          "description": "%config.rememberLastStyle.description%"
         },
         "nanoBanana.defaultAspectRatio": {
           "type": "string",
@@ -99,12 +99,37 @@
             "21:9"
           ],
           "default": "1:1",
-          "description": "Default aspect ratio for image generation."
+          "description": "%config.defaultAspectRatio.description%"
         },
         "nanoBanana.rememberLastAspectRatio": {
           "type": "boolean",
           "default": true,
-          "description": "Remember last selected aspect ratio in workspace."
+          "description": "%config.rememberLastAspectRatio.description%"
+        },
+        "nanoBanana.displayLanguage": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "en",
+            "zh-TW",
+            "zh-CN",
+            "ja",
+            "ko",
+            "th",
+            "vi"
+          ],
+          "enumDescriptions": [
+            "%config.displayLanguage.auto%",
+            "%config.displayLanguage.en%",
+            "%config.displayLanguage.zhTW%",
+            "%config.displayLanguage.zhCN%",
+            "%config.displayLanguage.ja%",
+            "%config.displayLanguage.ko%",
+            "%config.displayLanguage.th%",
+            "%config.displayLanguage.vi%"
+          ],
+          "default": "auto",
+          "description": "%config.displayLanguage.description%"
         }
       }
     }
@@ -113,9 +138,12 @@
     "build": "node esbuild.js",
     "watch": "node esbuild.js --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "package:vsix": "npx @vscode/vsce package",
+    "publish:vscode": "pwsh -File scripts/publish-vscode.ps1"
   },
   "devDependencies": {
+    "@vscode/vsce": "^3.6.2",
     "@types/node": "^24.3.0",
     "@types/vscode": "^1.109.0",
     "esbuild": "^0.25.9",

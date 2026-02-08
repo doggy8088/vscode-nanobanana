@@ -4,33 +4,55 @@ import { UserFacingError } from '../errors';
 import { selectPreferredModel } from './modelSelection';
 
 const COVER_PROMPT_SYSTEM_INSTRUCTION = [
-  '你是資深平面設計師與攝影指導。',
-  '任務：把使用者提供的文章內容，轉成「文章封面圖」專用的高品質生圖提示詞。',
-  '輸出格式要求：只輸出最終提示詞本體，不要加標題、編號、說明、引號。',
-  '提示詞內容需包含：主題、構圖、鏡頭視角、光線、色彩風格、材質/細節、整體氛圍。',
-  '你必須遵守使用者提供的 Style directives、Text policy、Aspect ratio。',
-  '避免無關元素、扭曲、低清晰度、多餘肢體。',
-  '請輸出英文提示詞，長度約 80-180 字。'
+  'You are a senior visual designer and art director.',
+  'Task: Convert user source text into a high-quality image prompt intended for article cover visuals.',
+  'Output format: Return only the final prompt text. No headings, bullet points, numbering, or quotes.',
+  'Prompt must include: subject, composition, camera angle, lighting, color style, texture/detail, and mood.',
+  'You must follow user-provided Style directives, Text policy, and Aspect ratio.',
+  'Avoid unrelated elements, distortions, low quality artifacts, and extra limbs.',
+  'Output in English, around 80-180 words.'
 ].join('\n');
+
+export type Translator = (key: string, vars?: Record<string, string | number>) => string;
+
+const DEFAULT_TRANSLATOR: Translator = (key, vars) => {
+  const defaults: Record<string, string> = {
+    'error.copilotNoPrompt': 'Copilot returned an empty prompt. Please try again.',
+    'error.copilotNoModels':
+      'No Copilot models are available. Make sure GitHub Copilot is installed and signed in.'
+  };
+
+  const template = defaults[key] ?? key;
+  if (!vars) {
+    return template;
+  }
+
+  return template.replace(/\{(\w+)\}/g, (_, token: string) => {
+    const value = vars[token];
+    return value === undefined ? `{${token}}` : String(value);
+  });
+};
 
 export class CopilotPromptService {
   async generateCoverPrompt(
     request: CoverPromptRequest,
-    preferredModel: string
+    preferredModel: string,
+    t: Translator = DEFAULT_TRANSLATOR
   ): Promise<{ prompt: string; modelId: string }> {
     const models = await vscode.lm.selectChatModels({ vendor: 'copilot' });
-    const model = selectPreferredModel(models, preferredModel);
+    const model = selectPreferredModel(models, preferredModel, t('error.copilotNoModels'));
 
     const messages = [
       vscode.LanguageModelChatMessage.User(COVER_PROMPT_SYSTEM_INSTRUCTION),
       vscode.LanguageModelChatMessage.User(
         [
-          `文章內容：\n${request.sourceText}`,
+          `Source text:\n${request.sourceText}`,
           '',
           `Style: ${request.styleLabel}`,
           `Style directives: ${request.styleDirectives}`,
           `Aspect ratio: ${request.aspectRatio}`,
-          `Text policy: ${request.textPolicyInstruction}`
+          `Text policy: ${request.textPolicyInstruction}`,
+          `Locale hint: ${request.locale}`
         ].join('\n')
       )
     ];
@@ -48,7 +70,7 @@ export class CopilotPromptService {
 
     const prompt = content.trim();
     if (!prompt) {
-      throw new UserFacingError('Copilot 未回傳可用的提示詞，請稍後重試。');
+      throw new UserFacingError(t('error.copilotNoPrompt'));
     }
 
     return { prompt, modelId: model.id };

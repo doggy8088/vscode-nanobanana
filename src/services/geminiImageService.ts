@@ -22,6 +22,33 @@ const LEGACY_MODEL_ALIASES: Record<string, string> = {
   'gpt-2.5-flash-image': 'gemini-2.5-flash-image'
 };
 
+export type Translator = (key: string, vars?: Record<string, string | number>) => string;
+
+const DEFAULT_TRANSLATOR: Translator = (key, vars) => {
+  const defaults: Record<string, string> = {
+    'error.noGeminiApiKey':
+      'Gemini API Key is not set. Run "Nano Banana: Set Gemini API Key" first.',
+    'error.modelIdEmpty': 'modelId is empty. Update nanoBanana.modelId in settings.',
+    'error.geminiFailed': 'Gemini API failed ({status}): {message}',
+    'error.geminiNoImage': 'Gemini did not return image data.',
+    'error.geminiNetwork': 'Unable to reach Gemini API: {detail}',
+    'log.geminiModelAliasApplied': 'Gemini model alias applied => {requested} -> {resolved}',
+    'log.geminiRequestModel': 'Gemini request => model={modelId}',
+    'log.geminiRetryStatus': 'Gemini returned {status}; retrying once.',
+    'log.geminiRetryOnce': 'Gemini request failed on first attempt; retrying once.'
+  };
+
+  const template = defaults[key] ?? key;
+  if (!vars) {
+    return template;
+  }
+
+  return template.replace(/\{(\w+)\}/g, (_, token: string) => {
+    const value = vars[token];
+    return value === undefined ? `{${token}}` : String(value);
+  });
+};
+
 export class GeminiImageService {
   constructor(
     private readonly apiKeyProvider: GeminiApiKeyProvider,
@@ -29,20 +56,28 @@ export class GeminiImageService {
     private readonly fetchImpl: FetchLike = fetch
   ) {}
 
-  async generateImage(options: GeminiGenerateOptions): Promise<GeneratedImagePayload> {
+  async generateImage(
+    options: GeminiGenerateOptions,
+    t: Translator = DEFAULT_TRANSLATOR
+  ): Promise<GeneratedImagePayload> {
     const apiKey = await this.apiKeyProvider.getGeminiApiKey();
     if (!apiKey) {
-      throw new UserFacingError('尚未設定 Gemini API Key，請先執行「Nano Banana: 設定 Gemini API Key」。');
+      throw new UserFacingError(t('error.noGeminiApiKey'));
     }
 
     const requestedModelId = normalizeModelId(options.modelId);
     const modelId = resolveModelAlias(requestedModelId);
     if (!modelId) {
-      throw new UserFacingError('設定中的 modelId 為空，請先更新 nanoBanana.modelId。');
+      throw new UserFacingError(t('error.modelIdEmpty'));
     }
 
     if (requestedModelId !== modelId) {
-      this.logger?.appendLine(`Gemini model alias applied => ${requestedModelId} -> ${modelId}`);
+      this.logger?.appendLine(
+        t('log.geminiModelAliasApplied', {
+          requested: requestedModelId,
+          resolved: modelId
+        })
+      );
     }
 
     const base = options.baseUrl.replace(/\/+$/, '');
@@ -61,19 +96,24 @@ export class GeminiImageService {
       }
     };
 
-    this.logger?.appendLine(`Gemini request => model=${modelId}`);
-    const response = await this.sendWithRetry(url, apiKey, requestBody);
+    this.logger?.appendLine(t('log.geminiRequestModel', { modelId }));
+    const response = await this.sendWithRetry(url, apiKey, requestBody, t);
 
     if (!response.ok) {
       const message = await this.readErrorMessage(response);
-      throw new UserFacingError(`Gemini API 失敗 (${response.status}): ${message}`);
+      throw new UserFacingError(
+        t('error.geminiFailed', {
+          status: response.status,
+          message
+        })
+      );
     }
 
     const payload = (await response.json()) as GeminiGenerateResponse;
     const imagePart = this.findImagePart(payload);
 
     if (!imagePart?.data) {
-      const fallbackError = payload.error?.message ?? 'Gemini 未回傳圖片資料。';
+      const fallbackError = payload.error?.message ?? t('error.geminiNoImage');
       throw new UserFacingError(fallbackError);
     }
 
@@ -88,7 +128,12 @@ export class GeminiImageService {
     };
   }
 
-  private async sendWithRetry(url: string, apiKey: string, body: unknown): Promise<Response> {
+  private async sendWithRetry(
+    url: string,
+    apiKey: string,
+    body: unknown,
+    t: Translator
+  ): Promise<Response> {
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -104,7 +149,7 @@ export class GeminiImageService {
         });
 
         if (attempt === 1 && response.status >= 500) {
-          this.logger?.appendLine(`Gemini returned ${response.status}, retrying once.`);
+          this.logger?.appendLine(t('log.geminiRetryStatus', { status: response.status }));
           continue;
         }
 
@@ -115,11 +160,15 @@ export class GeminiImageService {
           break;
         }
 
-        this.logger?.appendLine('Gemini request failed on first attempt, retrying once.');
+        this.logger?.appendLine(t('log.geminiRetryOnce'));
       }
     }
 
-    throw new UserFacingError(`無法連線 Gemini API: ${String(lastError)}`);
+    throw new UserFacingError(
+      t('error.geminiNetwork', {
+        detail: String(lastError)
+      })
+    );
   }
 
   private async readErrorMessage(response: Response): Promise<string> {

@@ -17,10 +17,14 @@ function includesAnyField(model: ModelDescriptor, needle: string): boolean {
 
 export function selectPreferredModel<T extends ModelDescriptor>(
   models: T[],
-  preferred: string
+  preferred: string,
+  noModelsMessage?: string
 ): T {
   if (models.length === 0) {
-    throw new Error('No Copilot models available. Please ensure GitHub Copilot is installed and signed in.');
+    throw new Error(
+      noModelsMessage ??
+        'No Copilot models available. Please ensure GitHub Copilot is installed and signed in.'
+    );
   }
 
   const preferredNormalized = normalize(preferred);

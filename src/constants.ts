@@ -14,7 +14,8 @@ export const CONFIG_KEYS = {
   defaultStyle: 'defaultStyle',
   rememberLastStyle: 'rememberLastStyle',
   defaultAspectRatio: 'defaultAspectRatio',
-  rememberLastAspectRatio: 'rememberLastAspectRatio'
+  rememberLastAspectRatio: 'rememberLastAspectRatio',
+  displayLanguage: 'displayLanguage'
 } as const;
 
 export const DEFAULTS = {
@@ -25,7 +26,8 @@ export const DEFAULTS = {
   defaultStyle: 'article-cover',
   rememberLastStyle: true,
   defaultAspectRatio: '1:1',
-  rememberLastAspectRatio: true
+  rememberLastAspectRatio: true,
+  displayLanguage: 'auto'
 } as const;
 
 export const SECRETS = {

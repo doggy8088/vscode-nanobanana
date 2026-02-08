@@ -1,6 +1,6 @@
 export interface CoverPromptRequest {
   sourceText: string;
-  locale: 'zh-TW';
+  locale: string;
   styleLabel: string;
   styleDirectives: string;
   textPolicyInstruction: string;

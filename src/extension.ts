@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { getExtensionConfig } from './config';
 import { COMMANDS, CONFIG_KEYS, DEFAULTS, WORKSPACE_STATE_KEYS } from './constants';
 import { UserFacingError } from './errors';
+import { createRuntimeI18n } from './i18n';
 import { ApiKeyStore } from './services/apiKeyStore';
 import { CopilotPromptService } from './services/copilotPromptService';
 import { GeminiImageService } from './services/geminiImageService';
@@ -28,10 +29,13 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand(COMMANDS.setGeminiApiKey, async () => {
+      const config = readRuntimeConfig();
+      const i18n = createRuntimeI18n(config.displayLanguage, vscode.env.language);
+
       await executeSafely(async () => {
         const value = await vscode.window.showInputBox({
-          title: '設定 Gemini API Key',
-          prompt: '請輸入 Gemini API Key',
+          title: i18n.t('input.apiKeyTitle'),
+          prompt: i18n.t('input.apiKeyPrompt'),
           ignoreFocusOut: true,
           password: true
         });
@@ -42,20 +46,27 @@ export function activate(context: vscode.ExtensionContext): void {
 
         const trimmed = value.trim();
         if (!trimmed) {
-          throw new UserFacingError('API Key 不可為空。');
+          throw new UserFacingError(i18n.t('error.apiKeyEmpty'));
         }
 
         await apiKeyStore.setGeminiApiKey(trimmed);
-        vscode.window.showInformationMessage('Gemini API Key 已儲存。');
+        vscode.window.showInformationMessage(i18n.t('info.apiKeySaved'));
       }, output);
     })
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand(COMMANDS.generateFromSelection, async () => {
+      const config = readRuntimeConfig();
+      const i18n = createRuntimeI18n(config.displayLanguage, vscode.env.language);
+
       await executeSafely(async () => {
-        const config = readRuntimeConfig();
-        const style = await pickStylePreset(context, config.defaultStyle, config.rememberLastStyle);
+        const style = await pickStylePreset(
+          context,
+          config.defaultStyle,
+          config.rememberLastStyle,
+          i18n.t
+        );
         if (!style) {
           return;
         }
@@ -63,7 +74,8 @@ export function activate(context: vscode.ExtensionContext): void {
         const aspectRatio = await pickAspectRatio(
           context,
           config.defaultAspectRatio,
-          config.rememberLastAspectRatio
+          config.rememberLastAspectRatio,
+          i18n.t
         );
         if (!aspectRatio) {
           return;
@@ -72,41 +84,47 @@ export function activate(context: vscode.ExtensionContext): void {
         const editor = vscode.window.activeTextEditor;
         const selectedText = editor?.document.getText(editor.selection).trim() ?? '';
 
-        const sourceText = selectedText || (await requestInputText('請輸入要生成封面圖的文章內容'));
+        const sourceText = selectedText || (await requestInputText(i18n.t('input.coverSourcePrompt'), i18n.t));
         if (!sourceText) {
           return;
         }
 
+        const styleLabel = i18n.t(`style.${style.id}.label`);
+
         await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,
-            title: 'Nano Banana 正在生成圖片...',
+            title: i18n.t('progress.generating'),
             cancellable: false
           },
           async () => {
             const promptResult = await promptService.generateCoverPrompt(
               {
                 sourceText,
-                locale: 'zh-TW',
-                styleLabel: style.label,
+                locale: i18n.locale,
+                styleLabel,
                 styleDirectives: style.promptDirectives,
                 textPolicyInstruction: textPolicyInstruction(style.textPolicy),
                 aspectRatio
               },
-              config.copilotPromptModel
+              config.copilotPromptModel,
+              i18n.t
             );
 
-            output.appendLine(`Copilot model selected => ${promptResult.modelId}`);
-            const imagePayload = await geminiService.generateImage({
-              prompt: promptResult.prompt,
-              modelId: config.modelId,
-              baseUrl: config.geminiApiBaseUrl,
-              aspectRatio
-            });
+            output.appendLine(i18n.t('log.copilotModelSelected', { modelId: promptResult.modelId }));
+            const imagePayload = await geminiService.generateImage(
+              {
+                prompt: promptResult.prompt,
+                modelId: config.modelId,
+                baseUrl: config.geminiApiBaseUrl,
+                aspectRatio
+              },
+              i18n.t
+            );
 
             const filePath = await fileService.saveToTemp(imagePayload, config.imageOutputFormat);
             await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
-            vscode.window.showInformationMessage(`圖片已生成：${filePath}`);
+            vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: filePath }));
           }
         );
       }, output);
@@ -115,9 +133,16 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand(COMMANDS.generateFreeform, async () => {
+      const config = readRuntimeConfig();
+      const i18n = createRuntimeI18n(config.displayLanguage, vscode.env.language);
+
       await executeSafely(async () => {
-        const config = readRuntimeConfig();
-        const style = await pickStylePreset(context, config.defaultStyle, config.rememberLastStyle);
+        const style = await pickStylePreset(
+          context,
+          config.defaultStyle,
+          config.rememberLastStyle,
+          i18n.t
+        );
         if (!style) {
           return;
         }
@@ -125,36 +150,41 @@ export function activate(context: vscode.ExtensionContext): void {
         const aspectRatio = await pickAspectRatio(
           context,
           config.defaultAspectRatio,
-          config.rememberLastAspectRatio
+          config.rememberLastAspectRatio,
+          i18n.t
         );
         if (!aspectRatio) {
           return;
         }
 
-        const rawPrompt = await requestInputText('請輸入要生成的圖片描述');
+        const rawPrompt = await requestInputText(i18n.t('input.freeformPrompt'), i18n.t);
         if (!rawPrompt) {
           return;
         }
 
-        const enhancedPrompt = buildStyleEnhancedPrompt(rawPrompt, style, aspectRatio);
+        const styleLabel = i18n.t(`style.${style.id}.label`);
+        const enhancedPrompt = buildStyleEnhancedPrompt(rawPrompt, style, styleLabel, aspectRatio);
 
         await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,
-            title: 'Nano Banana 正在生成圖片...',
+            title: i18n.t('progress.generating'),
             cancellable: false
           },
           async () => {
-            const imagePayload = await geminiService.generateImage({
-              prompt: enhancedPrompt,
-              modelId: config.modelId,
-              baseUrl: config.geminiApiBaseUrl,
-              aspectRatio
-            });
+            const imagePayload = await geminiService.generateImage(
+              {
+                prompt: enhancedPrompt,
+                modelId: config.modelId,
+                baseUrl: config.geminiApiBaseUrl,
+                aspectRatio
+              },
+              i18n.t
+            );
 
             const filePath = await fileService.saveToTemp(imagePayload, config.imageOutputFormat);
             await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
-            vscode.window.showInformationMessage(`圖片已生成：${filePath}`);
+            vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: filePath }));
           }
         );
       }, output);
@@ -164,9 +194,12 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {}
 
-async function requestInputText(prompt: string): Promise<string | undefined> {
+async function requestInputText(
+  prompt: string,
+  t: (key: string, vars?: Record<string, string | number>) => string
+): Promise<string | undefined> {
   const value = await vscode.window.showInputBox({
-    title: 'Nano Banana 生圖',
+    title: t('input.dialogTitle'),
     prompt,
     ignoreFocusOut: true
   });
@@ -182,7 +215,8 @@ async function requestInputText(prompt: string): Promise<string | undefined> {
 async function pickStylePreset(
   context: vscode.ExtensionContext,
   configuredDefaultStyle: string,
-  rememberLastStyle: boolean
+  rememberLastStyle: boolean,
+  t: (key: string, vars?: Record<string, string | number>) => string
 ): Promise<StylePreset | undefined> {
   const rememberedStyleId = rememberLastStyle
     ? context.workspaceState.get<string>(WORKSPACE_STATE_KEYS.lastStyleId)
@@ -191,16 +225,16 @@ async function pickStylePreset(
   const defaultStyle = resolveStylePreset(rememberedStyleId ?? configuredDefaultStyle, DEFAULTS.defaultStyle);
 
   const items = STYLE_PRESETS.map((style) => ({
-    label: style.label,
-    description: style.description,
+    label: t(`style.${style.id}.label`),
+    description: t(`style.${style.id}.description`),
     detail: style.id,
     picked: style.id === defaultStyle.id,
     style
   }));
 
   const picked = await vscode.window.showQuickPick(items, {
-    title: '選擇圖片風格',
-    placeHolder: '請選擇生圖風格',
+    title: t('quickpick.style.title'),
+    placeHolder: t('quickpick.style.placeholder'),
     ignoreFocusOut: true
   });
 
@@ -218,7 +252,8 @@ async function pickStylePreset(
 async function pickAspectRatio(
   context: vscode.ExtensionContext,
   configuredDefaultAspectRatio: string,
-  rememberLastAspectRatio: boolean
+  rememberLastAspectRatio: boolean,
+  t: (key: string, vars?: Record<string, string | number>) => string
 ): Promise<AspectRatioOption | undefined> {
   const rememberedAspectRatio = rememberLastAspectRatio
     ? context.workspaceState.get<string>(WORKSPACE_STATE_KEYS.lastAspectRatio)
@@ -231,14 +266,14 @@ async function pickAspectRatio(
 
   const items = ASPECT_RATIO_OPTIONS.map((option) => ({
     label: option,
-    description: option === defaultAspectRatio ? '預設' : '',
+    description: option === defaultAspectRatio ? t('quickpick.default') : '',
     picked: option === defaultAspectRatio,
     aspectRatio: option
   }));
 
   const picked = await vscode.window.showQuickPick(items, {
-    title: '選擇圖片比例 (aspectRatio)',
-    placeHolder: '請選擇圖片比例',
+    title: t('quickpick.aspectRatio.title'),
+    placeHolder: t('quickpick.aspectRatio.placeholder'),
     ignoreFocusOut: true
   });
 
@@ -276,6 +311,8 @@ function readRuntimeConfig() {
   const rememberLastAspectRatio =
     config.get<boolean>(CONFIG_KEYS.rememberLastAspectRatio, DEFAULTS.rememberLastAspectRatio) ??
     DEFAULTS.rememberLastAspectRatio;
+  const displayLanguage =
+    config.get<string>(CONFIG_KEYS.displayLanguage, DEFAULTS.displayLanguage) ?? DEFAULTS.displayLanguage;
 
   return {
     modelId,
@@ -285,7 +322,8 @@ function readRuntimeConfig() {
     defaultStyle,
     rememberLastStyle,
     defaultAspectRatio,
-    rememberLastAspectRatio
+    rememberLastAspectRatio,
+    displayLanguage
   };
 }
 

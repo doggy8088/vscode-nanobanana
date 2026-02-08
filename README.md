@@ -1,22 +1,43 @@
-# Nano Banana Image Generator
+# Nano Banana Pro Image Generator
 
-A VS Code extension that generates images via Gemini API.
+A VS Code extension that generates images with Gemini API.
+It can build article-cover prompts through the GitHub Copilot Language Model API, then generate and open the output image in VS Code.
+
+Publish guide: `docs/vscode-publish.md`
 
 ## Features
 
-- Right-click command in editor: `使用 Nano Banana Pro 生圖`
-- Command to set Gemini API Key securely
-- Command for freeform image generation
-- Style picker before generation (12 built-in styles)
-- Aspect ratio picker before generation
-- Gemini image size is fixed to `1K`
-- Uses VS Code GitHub Copilot Language Model API to build article-cover prompts
+- Right-click command from editor selection: **Generate Image with Nano Banana Pro**
+- Freeform image generation command
+- Secure Gemini API key storage (`SecretStorage`)
+- Style picker (12 built-in styles)
+- Aspect ratio picker
+- Fixed image size: `1K`
+- Prompt generation with VS Code Copilot LM API (`vscode.lm`)
+- Runtime i18n for extension messages
+
+## Supported UI Languages
+
+- `en`
+- `zh-TW`
+- `zh-CN`
+- `ja`
+- `ko`
+- `th`
+- `vi`
+
+Language behavior:
+
+- Default: auto-detect from current VS Code display language
+- Optional override: `nanoBanana.displayLanguage`
 
 ## Commands
 
-- `使用 Nano Banana Pro 生圖` (`nanoBanana.generateFromSelection`)
-- `Nano Banana: 任意生圖` (`nanoBanana.generateFreeform`)
-- `Nano Banana: 設定 Gemini API Key` (`nanoBanana.setGeminiApiKey`)
+- `nanoBanana.generateFromSelection`
+- `nanoBanana.generateFreeform`
+- `nanoBanana.setGeminiApiKey`
+
+> Command labels are localized through `package.nls.*.json`.
 
 ## Settings
 
@@ -28,12 +49,20 @@ A VS Code extension that generates images via Gemini API.
 - `nanoBanana.rememberLastStyle` (default: `true`)
 - `nanoBanana.defaultAspectRatio` (default: `1:1`)
 - `nanoBanana.rememberLastAspectRatio` (default: `true`)
+- `nanoBanana.displayLanguage` (default: `auto`)
 
 ## Development
 
 ```bash
 npm install
 npm run typecheck
-npm run build
 npm run test
+npm run build
+```
+
+## Packaging / Publishing
+
+```bash
+npm run package:vsix
+npm run publish:vscode
 ```

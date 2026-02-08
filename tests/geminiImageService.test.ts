@@ -13,7 +13,7 @@ describe('GeminiImageService', () => {
         modelId: 'any-model',
         baseUrl: 'https://example.com'
       })
-    ).rejects.toThrow('尚未設定 Gemini API Key');
+    ).rejects.toThrow('Gemini API Key is not set');
   });
 
   it('maps legacy gpt model id to gemini id and returns decoded image bytes', async () => {
