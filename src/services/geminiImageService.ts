@@ -90,7 +90,7 @@ export class GeminiImageService {
       ],
       generationConfig: {
         responseModalities: ['IMAGE'],
-        ...buildImageConfig(options.imageSize, options.aspectRatio)
+        ...buildImageConfig(modelId, options.imageSize, options.aspectRatio)
       }
     };
 
@@ -262,19 +262,34 @@ function normalizeModelId(modelId: string): string {
   return normalized;
 }
 
-function buildImageConfig(imageSize: string | undefined, aspectRatio: string | undefined): {
-  imageConfig: { imageSize: string; aspectRatio?: string };
+function buildImageConfig(
+  modelId: string,
+  imageSize: string | undefined,
+  aspectRatio: string | undefined
+): {
+  imageConfig?: { imageSize?: string; aspectRatio?: string };
 } {
-  const size = normalizeImageSize(imageSize);
+  const includeImageSize = supportsImageSize(modelId);
+  const size = includeImageSize ? normalizeImageSize(imageSize) : undefined;
   const normalized = aspectRatio?.trim();
   const resolvedAspectRatio = normalized && isSupportedAspectRatio(normalized) ? normalized : undefined;
+  const imageConfig = {
+    ...(resolvedAspectRatio ? { aspectRatio: resolvedAspectRatio } : {}),
+    ...(size ? { imageSize: size } : {})
+  };
+
+  if (Object.keys(imageConfig).length === 0) {
+    return {};
+  }
 
   return {
-    imageConfig: {
-      imageSize: size,
-      ...(resolvedAspectRatio ? { aspectRatio: resolvedAspectRatio } : {})
-    }
+    imageConfig
   };
+}
+
+function supportsImageSize(modelId: string): boolean {
+  const normalized = normalizeModelId(modelId).toLowerCase();
+  return !normalized.startsWith('gemini-2.5-flash-image');
 }
 
 function normalizeImageSize(imageSize: string | undefined): string {

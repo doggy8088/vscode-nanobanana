@@ -109,6 +109,9 @@ describe('GeminiImageService', () => {
     expect(fetchMock.mock.calls[0][0]).toBe(
       'https://example.com/models/gemini-2.5-flash-image:generateContent'
     );
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const requestBody = JSON.parse(String(init.body));
+    expect(requestBody.generationConfig.imageConfig).toBeUndefined();
   });
 
   it('sends aspect ratio in generationConfig.imageConfig when provided', async () => {
@@ -201,6 +204,53 @@ describe('GeminiImageService', () => {
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     const requestBody = JSON.parse(String(init.body));
     expect(requestBody.generationConfig.imageConfig.imageSize).toBe('2K');
+  });
+
+  it('omits imageSize for gemini-2.5-flash-image even when provided', async () => {
+    const body = {
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                inlineData: {
+                  mimeType: 'image/png',
+                  data: Buffer.from('flash').toString('base64')
+                }
+              }
+            ]
+          }
+        }
+      ]
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+
+    const service = new GeminiImageService(
+      {
+        getGeminiApiKey: async () => 'secret'
+      },
+      undefined,
+      fetchMock as unknown as typeof fetch
+    );
+
+    await service.generateImage({
+      prompt: 'cover image',
+      modelId: 'gemini-2.5-flash-image',
+      baseUrl: 'https://example.com/',
+      imageSize: '4K',
+      aspectRatio: '16:9'
+    });
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const requestBody = JSON.parse(String(init.body));
+    expect(requestBody.generationConfig.imageConfig.aspectRatio).toBe('16:9');
+    expect(requestBody.generationConfig.imageConfig.imageSize).toBeUndefined();
   });
 
   it('includes reference image parts for image editing', async () => {

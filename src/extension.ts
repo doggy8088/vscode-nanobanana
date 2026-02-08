@@ -443,7 +443,7 @@ async function notifyAndOpenGeneratedImage(
   t: (key: string, vars?: Record<string, string | number>) => string
 ): Promise<void> {
   vscode.window.showInformationMessage(t('info.imageGenerated', { path: filePath }));
-  await vscode.commands.executeCommand(COMMANDS.openImageEditor, vscode.Uri.file(filePath));
+  await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
 }
 
 async function requestInputText(
