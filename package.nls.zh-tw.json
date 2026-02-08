@@ -11,6 +11,7 @@
   "config.geminiApiBaseUrl.description": "Gemini API 基底網址。",
   "config.copilotPromptModel.description": "提示詞生成時優先使用的 Copilot 模型 ID/family。可執行「Nano Banana：選擇 Copilot 提示詞模型」從 VS Code Language Model API 即時讀取模型。",
   "config.imageOutputFormat.description": "儲存圖片的輸出格式。",
+  "config.outputDirectory.description": "可選：生圖輸出的目標資料夾。留空時使用系統暫存資料夾。",
   "config.imageSize.description": "生圖尺寸（對應 Gemini imageConfig.imageSize）。",
   "config.defaultStyle.description": "預設風格 preset ID。",
   "config.rememberLastStyle.description": "記住工作區上次選擇的風格。",

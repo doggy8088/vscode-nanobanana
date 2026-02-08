@@ -188,7 +188,11 @@ export function activate(context: vscode.ExtensionContext): void {
                 abortBridge.signal
               );
 
-              const filePath = await fileService.saveToTemp(imagePayload, config.imageOutputFormat);
+              const filePath = await fileService.saveToTemp(
+                imagePayload,
+                config.imageOutputFormat,
+                config.outputDirectory
+              );
               await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
               vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: filePath }));
             } finally {
@@ -293,7 +297,11 @@ export function activate(context: vscode.ExtensionContext): void {
                 abortBridge.signal
               );
 
-              const filePath = await fileService.saveToTemp(imagePayload, config.imageOutputFormat);
+              const filePath = await fileService.saveToTemp(
+                imagePayload,
+                config.imageOutputFormat,
+                config.outputDirectory
+              );
               await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
               vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: filePath }));
               return {
@@ -369,7 +377,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
           const refinedFilePath = await fileService.saveToTemp(
             refinedImagePayload,
-            config.imageOutputFormat
+            config.imageOutputFormat,
+            config.outputDirectory
           );
           await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(refinedFilePath));
           vscode.window.showInformationMessage(i18n.t('info.imageGenerated', { path: refinedFilePath }));
@@ -534,6 +543,8 @@ function readRuntimeConfig() {
   const imageOutputFormat =
     config.get<string>(CONFIG_KEYS.imageOutputFormat, DEFAULTS.imageOutputFormat) ??
     DEFAULTS.imageOutputFormat;
+  const outputDirectory =
+    config.get<string>(CONFIG_KEYS.outputDirectory, DEFAULTS.outputDirectory) ?? DEFAULTS.outputDirectory;
   const imageSize = config.get<string>(CONFIG_KEYS.imageSize, DEFAULTS.imageSize) ?? DEFAULTS.imageSize;
   const defaultStyle =
     config.get<string>(CONFIG_KEYS.defaultStyle, DEFAULTS.defaultStyle) ?? DEFAULTS.defaultStyle;
@@ -554,6 +565,7 @@ function readRuntimeConfig() {
     geminiApiBaseUrl,
     copilotPromptModel: normalizedCopilotPromptModel,
     imageOutputFormat,
+    outputDirectory,
     imageSize,
     defaultStyle,
     rememberLastStyle,

@@ -11,6 +11,7 @@
   "config.geminiApiBaseUrl.description": "Gemini API 기본 URL입니다.",
   "config.copilotPromptModel.description": "프롬프트 생성 시 우선 사용할 Copilot 모델 ID/family입니다. \"Nano Banana: Copilot 프롬프트 모델 선택\" 명령으로 VS Code Language Model API의 사용 가능한 모델을 동적으로 불러올 수 있습니다.",
   "config.imageOutputFormat.description": "저장할 이미지 출력 형식입니다.",
+  "config.outputDirectory.description": "선택 사항: 생성된 이미지 저장 폴더. 비워두면 시스템 임시 폴더를 사용합니다.",
   "config.imageSize.description": "생성 이미지 크기(Gemini imageConfig.imageSize에 적용).",
   "config.defaultStyle.description": "기본 스타일 preset ID입니다.",
   "config.rememberLastStyle.description": "작업 영역에서 마지막 선택 스타일을 기억합니다.",

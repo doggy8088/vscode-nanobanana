@@ -11,6 +11,7 @@
   "config.geminiApiBaseUrl.description": "Gemini API のベース URL。",
   "config.copilotPromptModel.description": "プロンプト生成で優先する Copilot モデル ID/family。「Nano Banana: Copilot プロンプトモデルを選択」で VS Code Language Model API の利用可能モデルを動的に取得できます。",
   "config.imageOutputFormat.description": "保存する画像の出力形式。",
+  "config.outputDirectory.description": "任意: 生成画像の出力先フォルダー。空欄の場合はシステムの一時フォルダーを使用。",
   "config.imageSize.description": "生成画像サイズ（Gemini imageConfig.imageSize に適用）。",
   "config.defaultStyle.description": "既定のスタイル preset ID。",
   "config.rememberLastStyle.description": "ワークスペースで前回選択したスタイルを記憶する。",

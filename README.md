@@ -48,6 +48,7 @@ Language behavior:
 - `nanoBanana.geminiApiBaseUrl` (default: `https://generativelanguage.googleapis.com/v1beta`)
 - `nanoBanana.copilotPromptModel` (string; default: `auto`. Use command `nanoBanana.selectCopilotPromptModel` to load live model list)
 - `nanoBanana.imageOutputFormat` (default: `png`)
+- `nanoBanana.outputDirectory` (optional; default: empty. When empty, files are saved to system temp folder)
 - `nanoBanana.imageSize` (default: `1K`, options: `1K`, `2K`, `4K`)
 - `nanoBanana.defaultStyle` (dropdown; default: `article-cover`)
 - `nanoBanana.rememberLastStyle` (default: `true`)

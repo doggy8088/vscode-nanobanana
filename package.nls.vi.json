@@ -11,6 +11,7 @@
   "config.geminiApiBaseUrl.description": "Base URL của Gemini API.",
   "config.copilotPromptModel.description": "Model ID/family Copilot ưu tiên khi tạo prompt. Dùng lệnh \"Nano Banana: Chọn Copilot Prompt Model\" để nạp danh sách model khả dụng theo thời gian thực từ VS Code Language Model API.",
   "config.imageOutputFormat.description": "Định dạng ảnh đầu ra khi lưu.",
+  "config.outputDirectory.description": "Tùy chọn: thư mục đích cho ảnh được tạo. Để trống để dùng thư mục tạm của hệ thống.",
   "config.imageSize.description": "Kích thước ảnh khi tạo (áp dụng cho Gemini imageConfig.imageSize).",
   "config.defaultStyle.description": "ID preset phong cách mặc định.",
   "config.rememberLastStyle.description": "Ghi nhớ phong cách đã chọn gần nhất trong workspace.",

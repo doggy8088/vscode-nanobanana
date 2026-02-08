@@ -15,8 +15,12 @@ const JPEG_SOI = Buffer.from([0xff, 0xd8]);
 const CRC32_TABLE = buildCrc32Table();
 
 export class ImageFileService {
-  async saveToTemp(payload: GeneratedImagePayload, preferredFormat: string): Promise<string> {
-    const outputDir = path.join(os.tmpdir(), 'nano-banana-images');
+  async saveToTemp(
+    payload: GeneratedImagePayload,
+    preferredFormat: string,
+    outputDirectory?: string
+  ): Promise<string> {
+    const outputDir = resolveOutputDirectory(outputDirectory);
     await mkdir(outputDir, { recursive: true });
 
     const extension = this.resolveExtension(payload.mimeType, preferredFormat);
@@ -41,6 +45,15 @@ export class ImageFileService {
 
     return 'png';
   }
+}
+
+function resolveOutputDirectory(configuredOutputDirectory: string | undefined): string {
+  const trimmed = configuredOutputDirectory?.trim();
+  if (!trimmed) {
+    return path.join(os.tmpdir(), 'nano-banana-images');
+  }
+
+  return path.resolve(trimmed);
 }
 
 function attachPromptMetadata(bytes: Buffer, mimeType: string, prompt: string): Buffer {

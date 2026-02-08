@@ -11,6 +11,7 @@
   "config.geminiApiBaseUrl.description": "Gemini API base URL.",
   "config.copilotPromptModel.description": "Preferred Copilot model id/family for prompt generation. Use \"Nano Banana: Select Copilot Prompt Model\" to load live models from VS Code Language Model API.",
   "config.imageOutputFormat.description": "Output image format for saved files.",
+  "config.outputDirectory.description": "Optional target folder for generated images. Leave empty to use the system temp folder.",
   "config.imageSize.description": "Image size for generation (applies to Gemini imageConfig.imageSize).",
   "config.defaultStyle.description": "Default style preset id.",
   "config.rememberLastStyle.description": "Remember the last selected style in workspace.",

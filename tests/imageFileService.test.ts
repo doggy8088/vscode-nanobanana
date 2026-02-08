@@ -1,4 +1,6 @@
-import { readFile, unlink } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, unlink } from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ImageFileService } from '../src/services/imageFileService';
 
@@ -49,6 +51,32 @@ describe('ImageFileService', () => {
       expect(saved.includes(Buffer.from(prompt, 'utf8'))).toBe(true);
     } finally {
       await unlink(filePath).catch(() => {});
+    }
+  });
+
+  it('saves file into configured output directory when provided', async () => {
+    const service = new ImageFileService();
+    const customDir = await mkdtemp(path.join(os.tmpdir(), 'nano-banana-output-'));
+    const prompt = 'custom folder prompt';
+
+    let filePath = '';
+    try {
+      filePath = await service.saveToTemp(
+        {
+          bytes: Buffer.from(ONE_BY_ONE_PNG_BASE64, 'base64'),
+          mimeType: 'image/png',
+          prompt,
+          modelId: 'gemini-3-pro-image-preview'
+        },
+        'png',
+        customDir
+      );
+
+      expect(filePath.startsWith(customDir)).toBe(true);
+      const saved = await readFile(filePath);
+      expect(saved.includes(Buffer.from(prompt, 'utf8'))).toBe(true);
+    } finally {
+      await rm(customDir, { recursive: true, force: true }).catch(() => {});
     }
   });
 });

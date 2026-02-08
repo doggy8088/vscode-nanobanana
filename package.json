@@ -110,6 +110,11 @@
           "default": "png",
           "description": "%config.imageOutputFormat.description%"
         },
+        "nanoBanana.outputDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "%config.outputDirectory.description%"
+        },
         "nanoBanana.imageSize": {
           "type": "string",
           "enum": [
