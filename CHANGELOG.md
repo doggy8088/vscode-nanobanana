@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.1.3] - 2026-02-09
+
+### Fixed
+
+- Fixed TypeError "Body is unusable" when `GeminiImageService.generateImage` encountered API errors. The Response body was being consumed twice in error handling (first via `response.json()`, then via `response.text()` in catch block).
+
 ## [0.1.2] - 2026-02-09
 
 ### Added
