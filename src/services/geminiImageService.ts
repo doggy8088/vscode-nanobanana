@@ -185,11 +185,12 @@ export class GeminiImageService {
   }
 
   private async readErrorMessage(response: Response): Promise<string> {
+    const text = await response.text();
     try {
-      const payload = (await response.json()) as GeminiGenerateResponse;
-      return payload.error?.message ?? JSON.stringify(payload);
+      const payload = JSON.parse(text) as GeminiGenerateResponse;
+      return payload.error?.message ?? text;
     } catch {
-      return await response.text();
+      return text;
     }
   }
 
