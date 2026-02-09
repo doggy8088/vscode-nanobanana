@@ -328,4 +328,67 @@ describe('GeminiImageService', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('handles JSON error response without consuming body twice', async () => {
+    const errorBody = {
+      error: {
+        message: 'Invalid API key provided',
+        code: 401
+      }
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(errorBody), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+
+    const service = new GeminiImageService(
+      {
+        getGeminiApiKey: async () => 'secret'
+      },
+      undefined,
+      fetchMock as unknown as typeof fetch
+    );
+
+    await expect(
+      service.generateImage({
+        prompt: 'cover image',
+        modelId: 'gpt-3-pro-image-preview',
+        baseUrl: 'https://example.com/'
+      })
+    ).rejects.toThrow('Gemini API failed (401): Invalid API key provided');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('handles plain text error response without consuming body twice', async () => {
+    const errorText = 'Service temporarily unavailable';
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(errorText, {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain' }
+      })
+    );
+
+    const service = new GeminiImageService(
+      {
+        getGeminiApiKey: async () => 'secret'
+      },
+      undefined,
+      fetchMock as unknown as typeof fetch
+    );
+
+    await expect(
+      service.generateImage({
+        prompt: 'cover image',
+        modelId: 'gpt-3-pro-image-preview',
+        baseUrl: 'https://example.com/'
+      })
+    ).rejects.toThrow('Gemini API failed (503): Service temporarily unavailable');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2); // Retries on 503
+  });
 });
